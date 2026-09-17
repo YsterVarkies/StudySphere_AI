@@ -1,23 +1,16 @@
-
 require('dotenv').config();
 
-
-//  AI PROVIDER 
-// ============================================
-const PROVIDER = 'gemini'; 
-// ============================================
+const PROVIDER = 'gemini';
 
 const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Initialize clients
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ---------- CHAT ----------
 async function chat(question, context = '') {
   const prompt = context
     ? `Context from study materials:\n${context}\n\nQuestion: ${question}`
@@ -35,7 +28,6 @@ async function chat(question, context = '') {
     return completion.choices[0].message.content;
   }
 
-  // Gemini
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   const result = await model.generateContent([
     'You are a helpful academic assistant for university students.',
@@ -44,7 +36,6 @@ async function chat(question, context = '') {
   return result.response.text();
 }
 
-// ---------- GENERATE QUIZ ----------
 async function generateQuiz(text, numberOfQuestions = 5) {
   const prompt = `
 Create a multiple-choice quiz with ${numberOfQuestions} questions based on the following study material.
@@ -74,7 +65,6 @@ ${text}
     return JSON.parse(completion.choices[0].message.content);
   }
 
-  // Gemini
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
     generationConfig: { responseMimeType: 'application/json' },
@@ -83,7 +73,6 @@ ${text}
   return JSON.parse(result.response.text());
 }
 
-// ---------- GENERATE FLASHCARDS ----------
 async function generateFlashcards(text, numberOfCards = 8) {
   const prompt = `
 Create ${numberOfCards} flashcards based on the following study material.
@@ -111,7 +100,6 @@ ${text}
     return JSON.parse(completion.choices[0].message.content);
   }
 
-  // Gemini
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
     generationConfig: { responseMimeType: 'application/json' },
