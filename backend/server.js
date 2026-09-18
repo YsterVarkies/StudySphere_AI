@@ -1,4 +1,5 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 
 const express = require("express");
 
@@ -6,6 +7,15 @@ const app = express();
 
 app.use(express.json());
 
+// Database
+let db;
+
+try {
+    db = require("./config/db");
+} catch (error) {
+    console.error("Database configuration error:", error.message);
+    process.exitCode = 1;
+}
 
 // Routes
 const authRoutes = require("./routes/auth.routes");
@@ -29,9 +39,35 @@ app.get("/", (req, res) => {
     });
 });
 
-// Server
-const PORT = 5000;
+// Database connection test
+async function testDatabaseConnection() {
+    if (!db) {
+        return;
+    }
 
-app.listen(PORT, () => {
-    console.log(`StudySphere backend running on port ${PORT}`);
-});
+    try {
+        const [rows] = await db.query("SELECT 1 AS connected");
+
+        console.log("Database connection successful.");
+        console.log("Query result:", rows[0]);
+    } catch (error) {
+        console.error("Database connection failed.");
+        console.error(error.message);
+        process.exitCode = 1;
+    }
+}
+
+// Server
+const PORT = process.env.PORT || 5000;
+
+if (require.main === module) {
+    app.listen(PORT, async () => {
+        console.log(`StudySphere backend running on port ${PORT}`);
+        await testDatabaseConnection();
+    });
+}
+
+module.exports = {
+    app,
+    testDatabaseConnection
+};
