@@ -1,1 +1,72 @@
+// User Model
+// Handles all database queries related to users
 
+const db = require('../config/db'); //We need to setup a connection to the MySQL to enable DB connection
+
+// Get all users
+const getAllUsers = async () => {
+    const [rows] = await db.query(`
+        SELECT 
+            user_id,
+            cohort_id,
+            first_name,
+            last_name,
+            email,
+            role,
+            is_active,
+            created_at
+        FROM user
+    `);
+
+    return rows;
+};
+
+// Get one user by ID
+const getUserById = async (userId) => {
+    const [rows] = await db.query(`
+        SELECT 
+            user_id,
+            cohort_id,
+            first_name,
+            last_name,
+            email,
+            role,
+            is_active,
+            created_at
+        FROM user
+        WHERE user_id = ?
+    `, [userId]);
+
+    return rows[0];
+};
+
+// Update a user's role
+const updateUserRole = async (userId, role) => {
+    const [result] = await db.query(
+        `UPDATE user
+         SET role = ?
+         WHERE user_id = ?`,
+        [role, userId]
+    );
+
+    return result;
+};
+
+// Activate or deactivate a user account
+const updateUserStatus = async (userId, isActive) => {
+    const [result] = await db.query(
+        `UPDATE user
+         SET is_active = ?
+         WHERE user_id = ?`,
+        [isActive, userId]
+    );
+
+    return result;
+};
+
+module.exports = {
+    getAllUsers,
+    getUserById,
+    updateUserRole,
+    updateUserStatus
+};
