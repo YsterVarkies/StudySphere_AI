@@ -37,6 +37,19 @@ const authenticateToken = (req, res, next) => {
     }
 };
 
+const requireRole = (role) => {
+    return (req, res, next) => {
+        if (req.user.role !== role) {
+            return res.status(403).json({
+                message: "Access denied. You do not have permission to access this resource."
+            });
+        }
+
+        next();
+    };
+};
+
 module.exports = {
-    authenticateToken
+    authenticateToken,
+    requireRole
 };
