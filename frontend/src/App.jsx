@@ -1,105 +1,370 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 
-const announcements = [
-  {
-    tag: 'Campus-wide',
-    tagClass: 'amber',
-    text: 'Library extended hours begin this weekend for the exam period.',
-  },
-  {
-    tag: 'Database Systems',
-    tagClass: 'mint',
-    text: 'Assignment 3 rubric has been uploaded to the module page.',
-  },
-]
+const emptyTask = {
+  title: '',
+  subject: '',
+  date: '',
+  time: '',
+  priority: 'Medium',
+  description: '',
+}
 
-const metrics = [
-  { label: 'Active modules', value: 5, meta: 'Across 2 cohorts' },
-  { label: 'Upcoming deadlines', value: 3, meta: '1 due within 48 hours' },
-  { label: 'AI questions this week', value: 12, meta: 'of 20/min limit' },
-]
+const emptyAnnouncement = {
+  title: '',
+  message: '',
+  category: 'General',
+}
 
-const deadlines = [
-  {
-    title: 'Database Systems — Assignment 3',
-    subtitle: 'Due tomorrow, 23:59',
-    timing: '48h',
-    iconClass: 'red',
-    type: 'paper',
-  },
-  {
-    title: 'Networks — Semester Test 2',
-    subtitle: 'Fri, 6 Sep • 09:00',
-    timing: 'Exam',
-    iconClass: 'purple',
-    type: 'book',
-  },
-  {
-    title: 'Group study session — OS module',
-    subtitle: 'Mon, 9 Sep • 14:00',
-    timing: 'Study',
-    iconClass: 'green',
-    type: 'group',
-  },
-]
+function getTaskStorageKey(email) {
+  return `studysphere_tasks_${email.toLowerCase()}`
+}
 
-const documents = [
-  { name: 'Lecture 4 — Normalisation.pdf', size: 'Database Systems • 2.1 MB', iconClass: 'file' },
-  { name: 'Tutorial 3 Notes.docx', size: 'Computer Networks • 640 KB', iconClass: 'doc' },
-  { name: 'Week 6 Summary.txt', size: 'Operating Systems • 12 KB', iconClass: 'text' },
-]
+function loadTasks(email) {
+  try {
+    const storedTasks = JSON.parse(localStorage.getItem(getTaskStorageKey(email)) || '[]')
+    return Array.isArray(storedTasks) ? storedTasks : []
+  } catch {
+    return []
+  }
+}
 
-const plannerDays = [
-  { label: 'Mon 2', value: '' },
-  { label: 'Tue 3', value: '' },
-  { label: 'Wed 4', value: 'Assignment 3 due', accent: 'salmon' },
-  { label: 'Thu 5', value: 'Networks test', accent: 'lavender' },
-  { label: 'Fri 6', value: 'Revision session', accent: 'mint' },
-]
+function saveTasks(email, tasksToSave) {
+  try {
+    localStorage.setItem(getTaskStorageKey(email), JSON.stringify(tasksToSave))
+  } catch {
+    // Task state still works for this session if browser storage is unavailable.
+  }
+}
 
-const tasks = [
-  {
-    title: 'Database Systems — Assignment 3',
-    date: 'Wed, 4 Sep • 23:59',
-    tag: 'Assignment',
-    tagClass: 'assignment',
-    done: false,
-  },
-  {
-    title: 'Networks — Semester Test 2',
-    date: 'Fri, 6 Sep • 09:00',
-    tag: 'Exam',
-    tagClass: 'exam',
-    done: false,
-  },
-  {
-    title: 'Group study session — OS module',
-    date: 'Sun, 8 Sep • 14:00',
-    tag: 'Study',
-    tagClass: 'study',
-    done: true,
-  },
-]
+function getAnnouncementStorageKey(email) {
+  return `studysphere_announcements_${email.toLowerCase()}`
+}
 
-const publishedAnnouncements = [
-  {
-    tag: 'Campus-wide',
-    tagClass: 'amber',
-    title: 'Library extended hours',
-    published: 'Published 2 Sep',
-  },
-  {
-    tag: 'Database Systems',
-    tagClass: 'mint',
-    title: 'Assignment 3 rubric uploaded',
-    published: 'Published 1 Sep',
-  },
-]
+function loadAnnouncements(email) {
+  try {
+    const storedAnnouncements = JSON.parse(localStorage.getItem(getAnnouncementStorageKey(email)) || '[]')
+    return Array.isArray(storedAnnouncements) ? sortAnnouncements(storedAnnouncements) : []
+  } catch {
+    return []
+  }
+}
 
-export function Login({ onLogin }) {
-  const [firstName, setFirstName] = useState('')
-  const [surname, setSurname] = useState('')
+function sortAnnouncements(announcementsToSort) {
+  return [...announcementsToSort].sort((firstAnnouncement, secondAnnouncement) => (
+    new Date(secondAnnouncement.publishedAt).getTime() - new Date(firstAnnouncement.publishedAt).getTime()
+  ))
+}
+
+function saveAnnouncements(email, announcementsToSave) {
+  try {
+    localStorage.setItem(getAnnouncementStorageKey(email), JSON.stringify(announcementsToSave))
+  } catch {
+    // Announcement state still works for this session if browser storage is unavailable.
+  }
+}
+
+function loadUsers() {
+  try {
+    const users = JSON.parse(localStorage.getItem('studysphere_users') || '{}')
+    return users && typeof users === 'object' ? users : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveUsers(users) {
+  localStorage.setItem('studysphere_users', JSON.stringify(users))
+}
+
+function loadSession() {
+  try {
+    return JSON.parse(localStorage.getItem('studysphere_session') || 'null')
+  } catch {
+    return null
+  }
+}
+
+function saveSession(user) {
+  try {
+    localStorage.setItem('studysphere_session', JSON.stringify(user))
+  } catch {
+    // The in-memory session remains available if browser storage is unavailable.
+  }
+}
+
+function clearSession() {
+  try {
+    localStorage.removeItem('studysphere_session')
+  } catch {
+    // Nothing else is needed when storage is unavailable.
+  }
+}
+
+function formatTaskDate(task) {
+  if (!task.date) return 'No date set'
+  const taskDate = new Date(`${task.date}T${task.time || '00:00'}`)
+  if (Number.isNaN(taskDate.getTime())) return task.date
+  return taskDate.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+function getTaskStatus(task) {
+  if (task.completed) return 'completed'
+  if (!task.date) return 'upcoming'
+
+  const today = new Date()
+  const todayKey = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-')
+  const taskDate = new Date(`${task.date}T${task.time || '23:59'}`)
+
+  if (Number.isNaN(taskDate.getTime())) return 'upcoming'
+  if (task.date === todayKey) return taskDate < today ? 'overdue' : 'today'
+  return taskDate < today ? 'overdue' : 'upcoming'
+}
+
+function getTaskTimestamp(task) {
+  const timestamp = new Date(`${task.date}T${task.time || '23:59'}`).getTime()
+  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp
+}
+
+function sortTasksByDate(tasksToSort) {
+  return [...tasksToSort].sort((firstTask, secondTask) => (
+    getTaskTimestamp(firstTask) - getTaskTimestamp(secondTask)
+  ))
+}
+
+function PlannerClock() {
+  const [currentDateTime, setCurrentDateTime] = useState(() => new Date())
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCurrentDateTime(new Date())
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
+
+  const dateText = currentDateTime.toLocaleDateString('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  const timeText = currentDateTime.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+
+  return (
+    <div className="planner-clock" aria-live="polite">
+      <span className="planner-clock-label">Today</span>
+      <strong>{dateText}</strong>
+      <time>{timeText}</time>
+    </div>
+  )
+}
+
+function TaskForm({ task, onSave, onCancel }) {
+  const [formData, setFormData] = useState(task || emptyTask)
+  const [formError, setFormError] = useState('')
+
+  function updateField(field, value) {
+    setFormData((current) => ({ ...current, [field]: value }))
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    if (!formData.title.trim() || !formData.subject.trim() || !formData.date || !formData.time) {
+      setFormError('Please complete the task title, subject, date, and time.')
+      return
+    }
+
+    onSave({
+      ...formData,
+      title: formData.title.trim(),
+      subject: formData.subject.trim(),
+      description: formData.description.trim(),
+    })
+  }
+
+  return (
+    <div className="task-modal-backdrop" role="presentation">
+      <form className="task-modal panel" onSubmit={handleSubmit}>
+        <div className="task-modal-header">
+          <div>
+            <p className="form-kicker">STUDY PLANNER</p>
+            <h2>{task ? 'Edit task' : 'Add task'}</h2>
+          </div>
+          <button className="modal-close" type="button" onClick={onCancel} aria-label="Close task form">×</button>
+        </div>
+
+        <div className="task-form-grid">
+          <label className="task-form-field task-form-field-wide">
+            Task title
+            <input type="text" value={formData.title} onChange={(event) => updateField('title', event.target.value)} autoFocus />
+          </label>
+          <label className="task-form-field">
+            Subject
+            <input type="text" value={formData.subject} onChange={(event) => updateField('subject', event.target.value)} />
+          </label>
+          <label className="task-form-field">
+            Date
+            <input type="date" value={formData.date} onChange={(event) => updateField('date', event.target.value)} />
+          </label>
+          <label className="task-form-field">
+            Time
+            <input type="time" value={formData.time} onChange={(event) => updateField('time', event.target.value)} />
+          </label>
+          <label className="task-form-field">
+            Priority
+            <select value={formData.priority} onChange={(event) => updateField('priority', event.target.value)}>
+              <option>Low</option>
+              <option>Medium</option>
+              <option>High</option>
+            </select>
+          </label>
+          <label className="task-form-field task-form-field-wide">
+            Description
+            <textarea value={formData.description} onChange={(event) => updateField('description', event.target.value)} rows="3" />
+          </label>
+        </div>
+
+        {formError && <p className="task-form-error" role="alert">{formError}</p>}
+        <div className="task-modal-actions">
+          <button className="modal-secondary-button" type="button" onClick={onCancel}>Cancel</button>
+          <button className="planner-button" type="submit">{task ? 'Save changes' : 'Save task'}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function AnnouncementForm({ announcement, onSave, onCancel }) {
+  const [formData, setFormData] = useState(announcement || emptyAnnouncement)
+  const [formError, setFormError] = useState('')
+
+  function updateField(field, value) {
+    setFormData((current) => ({ ...current, [field]: value }))
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    if (!formData.title.trim() || !formData.message.trim() || !formData.category) {
+      setFormError('Please complete the title, message, and category.')
+      return
+    }
+
+    onSave({
+      ...formData,
+      title: formData.title.trim(),
+      message: formData.message.trim(),
+    })
+  }
+
+  return (
+    <div className="task-modal-backdrop" role="presentation">
+      <form className="task-modal panel" onSubmit={handleSubmit}>
+        <div className="task-modal-header">
+          <div>
+            <p className="form-kicker">ANNOUNCEMENTS</p>
+            <h2>{announcement ? 'Edit announcement' : 'Add announcement'}</h2>
+          </div>
+          <button className="modal-close" type="button" onClick={onCancel} aria-label="Close announcement form">×</button>
+        </div>
+
+        <div className="task-form-grid">
+          <label className="task-form-field task-form-field-wide">
+            Announcement title
+            <input type="text" value={formData.title} onChange={(event) => updateField('title', event.target.value)} autoFocus />
+          </label>
+          <label className="task-form-field task-form-field-wide">
+            Message
+            <textarea value={formData.message} onChange={(event) => updateField('message', event.target.value)} rows="4" />
+          </label>
+          <label className="task-form-field task-form-field-wide">
+            Category
+            <select value={formData.category} onChange={(event) => updateField('category', event.target.value)}>
+              <option>General</option>
+              <option>Academic</option>
+              <option>Campus</option>
+              <option>Deadline</option>
+            </select>
+          </label>
+        </div>
+
+        {formError && <p className="task-form-error" role="alert">{formError}</p>}
+        <div className="task-modal-actions">
+          <button className="modal-secondary-button" type="button" onClick={onCancel}>Cancel</button>
+          <button className="planner-button" type="submit">{announcement ? 'Save changes' : 'Publish announcement'}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function TaskItem({ task, onEdit, onDelete, onToggle }) {
+  const status = getTaskStatus(task)
+
+  return (
+    <li className="task-row">
+      <div className="task-main">
+        <button
+          className={`checkbox ${task.completed ? 'checked' : ''}`}
+          type="button"
+          aria-label={task.completed ? `Mark ${task.title} incomplete` : `Mark ${task.title} complete`}
+          onClick={() => onToggle(task.id)}
+        ></button>
+        <div className="task-copy">
+          <div className={`task-title ${task.completed ? 'completed' : ''}`}>{task.title}</div>
+          <div className="task-subject">{task.subject}</div>
+          <div className="task-date">{formatTaskDate(task)}{task.time ? ` • ${task.time}` : ''}</div>
+          {task.description && <div className="task-description">{task.description}</div>}
+        </div>
+      </div>
+
+      <div className="task-actions">
+        <span className={`task-tag priority-${task.priority.toLowerCase()}`}>{task.priority}</span>
+        <span className={`task-status task-status-${status}`}>{status}</span>
+        <button className="task-action-button" type="button" onClick={() => onEdit(task)}>Edit</button>
+        <button className="task-action-button danger" type="button" onClick={() => onDelete(task.id)}>Delete</button>
+      </div>
+    </li>
+  )
+}
+
+function formatAnnouncementDate(announcement) {
+  const date = new Date(announcement.publishedAt)
+  if (Number.isNaN(date.getTime())) return 'Publication time unavailable'
+  return `Published: ${date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}, ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}`
+}
+
+function AnnouncementItem({ announcement, onEdit, onDelete, showActions = false }) {
+  return (
+    <article className="announcement-item">
+      <span className="tag mint">{announcement.category}</span>
+      <div className="announcement-copy">
+        <strong>{announcement.title}</strong>
+        <p>{announcement.message}</p>
+        <small>{formatAnnouncementDate(announcement)}</small>
+      </div>
+      {showActions && (
+        <div className="announcement-actions">
+          <button className="task-action-button" type="button" onClick={() => onEdit(announcement)}>Edit</button>
+          <button className="task-action-button danger" type="button" onClick={() => onDelete(announcement.id)}>Delete</button>
+        </div>
+      )}
+    </article>
+  )
+}
+
+function SuccessNotice({ message }) {
+  if (!message) return null
+
+  return <div className="success-notice" role="status">{message}</div>
+}
+
+export function Login({ onLogin, onRegister, successMessage }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState({})
@@ -108,32 +373,11 @@ export function Login({ onLogin }) {
   function handleSubmit(event) {
     event.preventDefault()
 
-    const trimmedFirstName = firstName.trim()
-    const trimmedSurname = surname.trim()
     const trimmedEmail = email.trim()
     const nextErrors = {}
-    const namePattern = /^[\p{L}][\p{L}\s'-]*[\p{L}]$/u
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-    setFirstName(trimmedFirstName)
-    setSurname(trimmedSurname)
     setEmail(trimmedEmail)
-
-    if (!trimmedFirstName) {
-      nextErrors.firstName = 'First name is required'
-    } else if (trimmedFirstName.length < 2) {
-      nextErrors.firstName = 'First name must be at least 2 characters'
-    } else if (!namePattern.test(trimmedFirstName)) {
-      nextErrors.firstName = 'First name can only contain letters, spaces, hyphens, or apostrophes'
-    }
-
-    if (!trimmedSurname) {
-      nextErrors.surname = 'Surname is required'
-    } else if (trimmedSurname.length < 2) {
-      nextErrors.surname = 'Surname must be at least 2 characters'
-    } else if (!namePattern.test(trimmedSurname)) {
-      nextErrors.surname = 'Surname can only contain letters, spaces, hyphens, or apostrophes'
-    }
 
     if (!trimmedEmail) {
       nextErrors.email = 'Email is required'
@@ -150,48 +394,32 @@ export function Login({ onLogin }) {
       return
     }
 
-    let storedUsers = {}
-    try {
-      storedUsers = JSON.parse(localStorage.getItem('studysphere_users') || '{}')
-    } catch {
-      storedUsers = {}
-    }
+    const storedUsers = loadUsers()
+    const storedUser = storedUsers[trimmedEmail.toLowerCase()]
 
-    const storedPassword = storedUsers[trimmedEmail]
-
-    // Prototype-only mock authentication: plaintext localStorage, no backend or hashing; not production-safe.
-    if (storedPassword && storedPassword !== password) {
-      setErrors({ password: 'Incorrect password for this email' })
+    if (!storedUser) {
+      setErrors({ email: 'Account not found. Please register before signing in.' })
       return
     }
 
-    if (!storedPassword && password.length < 6) {
-      setErrors({ password: 'Password must be at least 6 characters for a new account' })
+    const storedPassword = typeof storedUser === 'string' ? storedUser : storedUser.password
+    if (storedPassword !== password) {
+      setErrors({ password: 'Incorrect email or password.' })
       return
     }
 
-    if (!storedPassword) {
-      storedUsers[trimmedEmail] = password
-      try {
-        localStorage.setItem('studysphere_users', JSON.stringify(storedUsers))
-      } catch {
-        // Continue the prototype login if browser storage is unavailable.
-      }
-    }
-
-    const normalizedFirstName = trimmedFirstName.toLowerCase()
-    const displayFirstName = normalizedFirstName.charAt(0).toUpperCase() + normalizedFirstName.slice(1)
     setErrors({})
     onLogin({
-      firstName: displayFirstName,
-      surname: trimmedSurname,
+      firstName: storedUser.firstName || 'Student',
+      surname: storedUser.surname || '',
       email: trimmedEmail,
-      password,
+      studentNumber: storedUser.studentNumber || '',
     })
   }
 
   return (
     <main className="login-screen">
+      <SuccessNotice message={successMessage} />
       <section className="login-brand-panel" aria-label="StudySphere introduction">
         <div className="login-brand-copy">
           <div className="login-wordmark">
@@ -221,44 +449,8 @@ export function Login({ onLogin }) {
             <p className="login-subtitle">Sign in to continue your study journey.</p>
           </div>
 
-          <div className="login-name-row">
-            <label className="login-field">
-              First name
-              <span className="login-input-wrap">
-                <svg className="login-input-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="12" cy="8" r="3.25" />
-                  <path d="M5.5 19c.7-3.1 2.9-4.7 6.5-4.7s5.8 1.6 6.5 4.7" />
-                </svg>
-                <input
-                  type="text"
-                  value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
-                  autoComplete="given-name"
-                />
-              </span>
-              {errors.firstName && <span className="login-error" role="alert">{errors.firstName}</span>}
-            </label>
-
-            <label className="login-field">
-              Surname
-              <span className="login-input-wrap">
-                <svg className="login-input-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="12" cy="8" r="3.25" />
-                  <path d="M5.5 19c.7-3.1 2.9-4.7 6.5-4.7s5.8 1.6 6.5 4.7" />
-                </svg>
-                <input
-                  type="text"
-                  value={surname}
-                  onChange={(event) => setSurname(event.target.value)}
-                  autoComplete="family-name"
-                />
-              </span>
-              {errors.surname && <span className="login-error" role="alert">{errors.surname}</span>}
-            </label>
-          </div>
-
           <label className="login-field">
-            Email address
+            Email / Username
             <span className="login-input-wrap">
               <svg className="login-input-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
@@ -302,6 +494,7 @@ export function Login({ onLogin }) {
           </label>
 
           <button className="planner-button login-submit" type="submit">Log in</button>
+          <p className="auth-switch">Don&apos;t have an account? <button type="button" onClick={onRegister}>Register</button></p>
           <p className="login-footer">StudySphere · Student Portal</p>
         </form>
       </section>
@@ -309,40 +502,238 @@ export function Login({ onLogin }) {
   )
 }
 
+export function Registration({ onSignIn }) {
+  const [formData, setFormData] = useState({
+    firstName: '',
+    surname: '',
+    studentNumber: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    programme: '',
+    yearOfStudy: '',
+  })
+  const [errors, setErrors] = useState({})
+  const [success, setSuccess] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  function updateField(field, value) {
+    setFormData((current) => ({ ...current, [field]: value }))
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    const firstName = formData.firstName.trim()
+    const surname = formData.surname.trim()
+    const studentNumber = formData.studentNumber.trim()
+    const email = formData.email.trim().toLowerCase()
+    const nextErrors = {}
+    const namePattern = /^[\p{L}][\p{L}\s'-]*[\p{L}]$/u
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    if (!firstName) nextErrors.firstName = 'Please enter your first name.'
+    else if (firstName.length < 2 || !namePattern.test(firstName)) nextErrors.firstName = 'Enter a valid first name.'
+    if (!surname) nextErrors.surname = 'Please enter your last name.'
+    else if (surname.length < 2 || !namePattern.test(surname)) nextErrors.surname = 'Enter a valid last name.'
+    if (!studentNumber) nextErrors.studentNumber = 'Please enter your student number.'
+    if (!email) nextErrors.email = 'Please enter your email address.'
+    else if (!emailPattern.test(email)) nextErrors.email = 'Please enter a valid email address.'
+    if (!formData.password) nextErrors.password = 'Please create a password.'
+    else if (formData.password.length < 6) nextErrors.password = 'Password must be at least 6 characters.'
+    if (!formData.confirmPassword) nextErrors.confirmPassword = 'Please confirm your password.'
+    else if (formData.password !== formData.confirmPassword) nextErrors.confirmPassword = 'Passwords do not match.'
+
+    const users = loadUsers()
+    if (users[email]) nextErrors.email = 'An account with this email already exists. Please sign in instead.'
+    else if (Object.values(users).some((user) => typeof user !== 'string' && user.studentNumber === studentNumber)) {
+      nextErrors.studentNumber = 'An account with this student number already exists.'
+    }
+
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
+
+    // Prototype-only storage: passwords are plaintext in localStorage and must be replaced by backend hashing/authentication in production.
+    users[email] = {
+      firstName: firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase(),
+      surname,
+      studentNumber,
+      email,
+      password: formData.password,
+      programme: formData.programme.trim(),
+      yearOfStudy: formData.yearOfStudy,
+    }
+
+    try {
+      saveUsers(users)
+      setSuccess(true)
+    } catch {
+      setErrors({ form: 'Unable to save your account in this browser. Please try again.' })
+    }
+  }
+
+  if (success) {
+    return (
+      <main className="login-screen">
+        <section className="login-brand-panel" aria-label="StudySphere introduction">
+          <div className="login-brand-copy"><div className="login-wordmark"><span className="login-wordmark-mark">S</span><span>StudySphere</span></div><div className="login-brand-text"><p className="login-eyebrow">STUDENT PORTAL</p><h1>Start your next chapter.</h1><p>Create your account and make every study hour count.</p></div></div>
+        </section>
+        <section className="login-form-panel"><div className="login-card panel success-card"><p className="login-form-kicker">ACCOUNT READY</p><h1>Registration successful!</h1><p className="login-subtitle">Your StudySphere account has been created successfully. You can now sign in using your registered email and password.</p><button className="planner-button login-submit" type="button" onClick={onSignIn}>Sign in</button><p className="login-footer">StudySphere · Student Portal</p></div></section>
+      </main>
+    )
+  }
+
+  const inputFields = [
+    ['firstName', 'First name', 'text', 'given-name'],
+    ['surname', 'Last name', 'text', 'family-name'],
+    ['studentNumber', 'Student number', 'text', 'off'],
+    ['email', 'Email address', 'email', 'email'],
+  ]
+
+  return (
+    <main className="login-screen">
+      <section className="login-brand-panel" aria-label="StudySphere introduction"><div className="login-brand-copy"><div className="login-wordmark"><span className="login-wordmark-mark">S</span><span>StudySphere</span></div><div className="login-brand-text"><p className="login-eyebrow">STUDENT PORTAL</p><h1>Start your next chapter.</h1><p>Create your account and make every study hour count.</p></div></div></section>
+      <section className="login-form-panel"><form className="login-card panel registration-card" onSubmit={handleSubmit} noValidate><div className="login-form-heading"><p className="login-form-kicker">CREATE ACCOUNT</p><h1>Register for StudySphere</h1><p className="login-subtitle">Set up your student account to get started.</p></div>
+        <div className="registration-grid">{inputFields.map(([field, label, type, autoComplete]) => <label className="login-field" key={field}>{label}<span className="login-input-wrap"><input type={type} value={formData[field]} onChange={(event) => updateField(field, event.target.value)} autoComplete={autoComplete} /></span>{errors[field] && <span className="login-error" role="alert">{errors[field]}</span>}</label>)}</div>
+        <label className="login-field">Password<span className="login-input-wrap"><input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={(event) => updateField('password', event.target.value)} autoComplete="new-password" /><button className="password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label="Toggle password visibility">◉</button></span>{errors.password && <span className="login-error" role="alert">{errors.password}</span>}</label>
+        <label className="login-field">Confirm password<span className="login-input-wrap"><input type={showConfirmPassword ? 'text' : 'password'} value={formData.confirmPassword} onChange={(event) => updateField('confirmPassword', event.target.value)} autoComplete="new-password" /><button className="password-toggle" type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label="Toggle confirmation password visibility">◉</button></span>{errors.confirmPassword && <span className="login-error" role="alert">{errors.confirmPassword}</span>}</label>
+        <div className="registration-grid optional-fields"><label className="login-field">Course / Programme<input type="text" value={formData.programme} onChange={(event) => updateField('programme', event.target.value)} /></label><label className="login-field">Year of study<select value={formData.yearOfStudy} onChange={(event) => updateField('yearOfStudy', event.target.value)}><option value="">Select year</option><option>1</option><option>2</option><option>3</option><option>4+</option></select></label></div>
+        {errors.form && <p className="login-error" role="alert">{errors.form}</p>}<button className="planner-button login-submit" type="submit">Register</button><p className="auth-switch">Already have an account? <button type="button" onClick={onSignIn}>Sign in</button></p><p className="login-footer">StudySphere · Student Portal</p>
+      </form></section>
+    </main>
+  )
+}
+
 function App() {
   const [activeNav, setActiveNav] = useState('dashboard')
-  const [user, setUser] = useState(null)
-  const [sessionDate, setSessionDate] = useState(null)
+  const [authView, setAuthView] = useState('login')
+  const [user, setUser] = useState(loadSession)
+  const [announcements, setAnnouncements] = useState(() => {
+    const restoredUser = loadSession()
+    return restoredUser ? loadAnnouncements(restoredUser.email) : []
+  })
+  const [sessionDate, setSessionDate] = useState(() => new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }))
+  const [tasks, setTasks] = useState(() => {
+    const restoredUser = loadSession()
+    return restoredUser ? loadTasks(restoredUser.email) : []
+  })
+  const [taskModal, setTaskModal] = useState(null)
+  const [announcementModal, setAnnouncementModal] = useState(null)
+  const [successMessage, setSuccessMessage] = useState('')
 
-  function handleLogin({ firstName, surname, email }) {
+  useEffect(() => {
+    if (!successMessage) return undefined
+
+    const timeoutId = window.setTimeout(() => setSuccessMessage(''), 3500)
+    return () => window.clearTimeout(timeoutId)
+  }, [successMessage])
+
+  function handleLogin({ firstName, surname, email, studentNumber }) {
     const date = new Date()
     const formattedDate = date.toLocaleDateString('en-US', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
     })
+    const authenticatedUser = {
+      firstName: firstName.trim(),
+      surname: surname.trim(),
+      email: email.toLowerCase(),
+      studentNumber,
+    }
 
-    setUser({ firstName, surname, email })
+    setUser(authenticatedUser)
+    saveSession(authenticatedUser)
     setSessionDate(formattedDate)
+    setTasks(loadTasks(authenticatedUser.email))
+    setAnnouncements(loadAnnouncements(authenticatedUser.email))
+    setSuccessMessage('Successfully logged in!')
   }
 
   function handleLogout() {
     setUser(null)
+    clearSession()
     setSessionDate(null)
+    setTasks([])
+    setTaskModal(null)
+    setAnnouncements([])
+    setAnnouncementModal(null)
     setActiveNav('dashboard')
+    setAuthView('login')
+    setSuccessMessage('Successfully logged out!')
+  }
+
+  function updateTasks(nextTasks) {
+    setTasks(nextTasks)
+    saveTasks(user.email, nextTasks)
+  }
+
+  function handleSaveTask(taskData) {
+    const nextTasks = taskData.id
+      ? tasks.map((task) => (task.id === taskData.id ? { ...task, ...taskData } : task))
+      : [{ ...taskData, id: `${Date.now()}-${Math.random()}`, completed: false }, ...tasks]
+    updateTasks(nextTasks)
+    setTaskModal(null)
+  }
+
+  function handleDeleteTask(taskId) {
+    if (!window.confirm('Delete this task?')) return
+    updateTasks(tasks.filter((task) => task.id !== taskId))
+  }
+
+  function handleToggleTask(taskId) {
+    updateTasks(tasks.map((task) => (
+      task.id === taskId ? { ...task, completed: !task.completed } : task
+    )))
+  }
+
+  function updateAnnouncements(nextAnnouncements) {
+    setAnnouncements(nextAnnouncements)
+    saveAnnouncements(user.email, nextAnnouncements)
+  }
+
+  function handleSaveAnnouncement(announcementData) {
+    const nextAnnouncements = announcementData.id
+      ? announcements.map((announcement) => (
+        announcement.id === announcementData.id
+          ? { ...announcement, ...announcementData, publishedAt: announcement.publishedAt }
+          : announcement
+      ))
+      : [{ ...announcementData, id: `${Date.now()}-${Math.random()}`, publishedAt: new Date().toISOString() }, ...announcements]
+    updateAnnouncements(sortAnnouncements(nextAnnouncements))
+    setAnnouncementModal(null)
+  }
+
+  function handleDeleteAnnouncement(announcementId) {
+    if (!window.confirm('Delete this announcement?')) return
+    updateAnnouncements(announcements.filter((announcement) => announcement.id !== announcementId))
   }
 
   if (!user) {
-    return <Login onLogin={handleLogin} />
+    return authView === 'register'
+      ? <Registration onSignIn={() => setAuthView('login')} />
+      : <Login onLogin={handleLogin} onRegister={() => setAuthView('register')} successMessage={successMessage} />
   }
 
-  const firstName = user.firstName.trim()
-  const surname = user.surname?.trim() || ''
+  const currentUser = user
+  const firstName = currentUser.firstName.trim()
+  const surname = currentUser.surname?.trim() || ''
   const initials = `${firstName.charAt(0)}${surname.charAt(0)}`.toUpperCase()
   const fullName = `${firstName}${surname ? ` ${surname}` : ''}`
+  const completedTasks = tasks.filter((task) => getTaskStatus(task) === 'completed')
+  const overdueTasks = tasks.filter((task) => getTaskStatus(task) === 'overdue')
+  const pendingTasks = tasks.filter((task) => getTaskStatus(task) !== 'completed')
+  const upcomingTasks = sortTasksByDate(tasks.filter((task) => ['today', 'upcoming'].includes(getTaskStatus(task))))
+  const todayTasks = sortTasksByDate(tasks.filter((task) => getTaskStatus(task) === 'today'))
+  const pastTasks = sortTasksByDate(tasks.filter((task) => ['overdue', 'completed'].includes(getTaskStatus(task))))
 
   return (
     <div className="app-shell">
+      <SuccessNotice message={successMessage} />
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">S</div>
@@ -425,7 +816,7 @@ function App() {
 
       <main className="main-panel content-stack">
         <div className="session-bar">
-          <span className="session-badge">Logged in as {user.firstName}</span>
+          <span className="session-badge">Logged in as {currentUser.firstName}</span>
           <button className="logout-button" type="button" onClick={handleLogout}>Log out</button>
         </div>
 
@@ -434,119 +825,143 @@ function App() {
             <header className="topbar">
               <div className="heading-wrap">
                 <p className="date-line">{sessionDate}</p>
-                <h1>Welcome, {user.firstName}</h1>
+                <h1>Welcome, {currentUser.firstName}</h1>
               </div>
 
-              <button className="planner-button" type="button">
+              <button className="planner-button" type="button" onClick={() => setTaskModal(emptyTask)}>
                 <span className="plus">+</span> Add planner task
               </button>
             </header>
 
             <section className="announcement-card panel">
               <h2>Announcements</h2>
-              <div className="announcement-list">
-                {announcements.map((item) => (
-                  <div key={item.text} className="announcement-item">
-                    <span className={`tag ${item.tagClass}`}>{item.tag}</span>
-                    <p>{item.text}</p>
-                  </div>
-                ))}
-              </div>
+              {announcements.length > 0 ? (
+                <div className="announcement-list">
+                  {announcements.map((item) => (
+                    <AnnouncementItem key={item.id} announcement={item} />
+                  ))}
+                </div>
+              ) : (
+                <p className="announcement-empty">No announcements</p>
+              )}
             </section>
 
             <section className="metric-grid">
-              {metrics.map((metric) => (
-                <div key={metric.label} className="metric-card panel">
-                  <h3>{metric.label}</h3>
-                  <div className="metric-value">{metric.value}</div>
-                  <p>{metric.meta}</p>
+              <div className="metric-card panel">
+                <h3>Total tasks</h3>
+                <div className="metric-value">{tasks.length}</div>
+                <p>{tasks.length ? 'Created by you' : 'No tasks yet'}</p>
+              </div>
+              <div className="metric-card panel">
+                <h3>Completed</h3>
+                <div className="metric-value">{completedTasks.length}</div>
+                <p>{completedTasks.length ? 'Finished tasks' : 'None completed'}</p>
+              </div>
+              <div className="metric-card panel">
+                <h3>Pending</h3>
+                <div className="metric-value">{pendingTasks.length}</div>
+                <p>{pendingTasks.length ? 'Still to do' : 'Nothing pending'}</p>
+              </div>
+              <div className="metric-card panel">
+                <h3>Overdue</h3>
+                <div className="metric-value">{overdueTasks.length}</div>
+                <p>{overdueTasks.length ? 'Needs attention' : 'Nothing overdue'}</p>
+              </div>
+            </section>
+
+            <section className="dashboard-task-grid">
+              <div className="task-panel panel">
+                <div className="section-heading-row">
+                  <h2>Upcoming tasks</h2>
+                  <span className="section-count">{upcomingTasks.length}</span>
                 </div>
-              ))}
-            </section>
-
-            <section className="lower-grid">
-              <div className="panel deadlines-panel">
-                <h2>Upcoming deadlines</h2>
-
-                {deadlines.map((deadline) => (
-                  <div key={deadline.title} className="deadline-item">
-                    <div className={`deadline-icon ${deadline.iconClass}`}>
-                      <span className={deadline.type}></span>
-                    </div>
-
-                    <div className="deadline-copy">
-                      <h3>{deadline.title}</h3>
-                      <p>{deadline.subtitle}</p>
-                    </div>
-
-                    <div className="deadline-meta">{deadline.timing}</div>
+                {upcomingTasks.length ? (
+                  <ul className="task-list">
+                    {upcomingTasks.map((task) => (
+                      <TaskItem key={task.id} task={task} onEdit={setTaskModal} onDelete={handleDeleteTask} onToggle={handleToggleTask} />
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="empty-state">
+                    <strong>No upcoming tasks</strong>
+                    <p>Add a study task to start planning.</p>
                   </div>
-                ))}
+                )}
               </div>
 
-              <div className="panel documents-panel">
-                <h2>Recent documents</h2>
-
-                {documents.map((doc) => (
-                  <div key={doc.name} className="document-item">
-                    <div className={`doc-icon ${doc.iconClass}`}></div>
-
-                    <div className="doc-copy">
-                      <h3>{doc.name}</h3>
-                      <p>{doc.size}</p>
-                    </div>
-
-                    <button className="doc-action" type="button" aria-label={`Open ${doc.name}`}>
-                      <span className="action-mark"></span>
-                    </button>
+              <div className="task-panel panel">
+                <div className="section-heading-row">
+                  <h2>Today&apos;s tasks</h2>
+                  <span className="section-count">{todayTasks.length}</span>
+                </div>
+                {todayTasks.length ? (
+                  <ul className="task-list">
+                    {todayTasks.map((task) => (
+                      <TaskItem key={task.id} task={task} onEdit={setTaskModal} onDelete={handleDeleteTask} onToggle={handleToggleTask} />
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="empty-state">
+                    <strong>No tasks scheduled for today.</strong>
+                    <p>Your day is clear.</p>
                   </div>
-                ))}
+                )}
               </div>
             </section>
+
+            {pastTasks.length > 0 && (
+              <section className="task-panel panel past-task-panel">
+                <div className="section-heading-row">
+                  <h2>Past tasks</h2>
+                  <span className="section-count">{pastTasks.length}</span>
+                </div>
+                <ul className="task-list">
+                  {pastTasks.map((task) => (
+                    <TaskItem key={task.id} task={task} onEdit={setTaskModal} onDelete={handleDeleteTask} onToggle={handleToggleTask} />
+                  ))}
+                </ul>
+              </section>
+            )}
           </section>
-        ) : (
+        ) : activeNav === 'planner' ? (
           <section className="planner-view focused">
             <header className="planner-header">
               <div className="page-title-block">
                 <h1>Study planner</h1>
                 <p>Track assignments, exams and study sessions.</p>
+                <PlannerClock />
               </div>
 
-              <button className="planner-button" type="button">
+              <button className="planner-button" type="button" onClick={() => setTaskModal(emptyTask)}>
                 <span className="plus">+</span> Add task
               </button>
             </header>
 
-            <section className="planner-days" aria-label="Planner calendar">
-              {plannerDays.map((day) => (
-                <div key={day.label} className={`day-card ${day.accent ? day.accent : ''}`}>
-                  <span className="day-label">{day.label}</span>
-                  {day.value && <span className="day-chip">{day.value}</span>}
-                </div>
-              ))}
-            </section>
-
             <section className="task-panel panel">
-              <h2>This week</h2>
+              <div className="section-heading-row">
+                <div>
+                  <h2>Your tasks</h2>
+                  <p className="panel-subtitle">Add and manage your study workload in one place.</p>
+                </div>
+                <span className="section-count">{tasks.length}</span>
+              </div>
 
-              <ul className="task-list">
-                {tasks.map((task) => (
-                  <li key={task.title} className="task-row">
-                    <div className="task-main">
-                      <span className={`checkbox ${task.done ? 'checked' : ''}`}></span>
-                      <div className="task-copy">
-                        <div className="task-title">{task.title}</div>
-                        <div className="task-date">{task.date}</div>
-                      </div>
-                    </div>
-
-                    <span className={`task-tag ${task.tagClass}`}>{task.tag}</span>
-                  </li>
-                ))}
-              </ul>
+              {tasks.length ? (
+                <ul className="task-list">
+                  {tasks.map((task) => (
+                    <TaskItem key={task.id} task={task} onEdit={setTaskModal} onDelete={handleDeleteTask} onToggle={handleToggleTask} />
+                  ))}
+                </ul>
+              ) : (
+                <div className="empty-state planner-empty-state">
+                  <strong>No tasks yet</strong>
+                  <p>Add your first task to get started.</p>
+                  <button className="planner-button" type="button" onClick={() => setTaskModal(emptyTask)}>Add your first task</button>
+                </div>
+              )}
             </section>
           </section>
-        )}
+        ) : null}
       </main>
 
       {activeNav === 'announcements' && (
@@ -560,69 +975,50 @@ function App() {
           <div className="announcements-content">
             <div className="announcements-header">
               <h1>Announcements</h1>
-              <p>Broadcast updates to students.</p>
+              <p>Updates from StudySphere.</p>
+              <button className="planner-button announcement-add-button" type="button" onClick={() => setAnnouncementModal(emptyAnnouncement)}>
+                <span className="plus">+</span> Add announcement
+              </button>
             </div>
 
-            <div className="announcement-editor panel">
-              <div className="editor-title">New announcement</div>
-
-              <div className="field-block">
-                <label htmlFor="announcement-title">Title</label>
-                <input id="announcement-title" type="text" value="Library extended hours" readOnly />
-              </div>
-
-              <div className="field-block">
-                <label htmlFor="announcement-message">Message</label>
-                <textarea id="announcement-message" readOnly defaultValue="Write the announcement..." />
-              </div>
-
-              <div className="meta-row">
-                <div className="field-block audience-field">
-                  <label htmlFor="announcement-audience">Audience</label>
-                  <div className="select-wrap">
-                    <select id="announcement-audience" defaultValue="Campus-wide">
-                      <option>Campus-wide</option>
-                      <option>Database Systems</option>
-                    </select>
-                  </div>
+            <div className="published-panel panel announcement-read-only">
+              <div className="published-header">Available announcements</div>
+              {announcements.length > 0 ? (
+                <div className="announcement-list">
+                  {announcements.map((item) => (
+                    <AnnouncementItem
+                      key={item.id}
+                      announcement={item}
+                      onEdit={setAnnouncementModal}
+                      onDelete={handleDeleteAnnouncement}
+                      showActions
+                    />
+                  ))}
                 </div>
-
-                <div className="field-block date-field">
-                  <label htmlFor="announcement-date">Expires (optional)</label>
-                  <div className="date-wrap">
-                    <input id="announcement-date" type="text" defaultValue="yyyy/mm/dd" readOnly />
-                    <span className="calendar-icon" aria-hidden="true"></span>
-                  </div>
-                </div>
-              </div>
-
-              <button className="publish-button" type="button">Publish announcement</button>
-            </div>
-
-            <div className="published-panel panel">
-              <div className="published-header">Published</div>
-
-              {publishedAnnouncements.map((item) => (
-                <div key={item.title} className="published-item">
-                  <span className={`published-tag ${item.tagClass}`}>{item.tag}</span>
-                  <div className="published-copy">
-                    <div className="published-title">{item.title}</div>
-                    <div className="published-date">{item.published}</div>
-                  </div>
-                  <button className="trash-button" type="button" aria-label={`Delete ${item.title}`}>
-                    <span aria-hidden="true">🗑</span>
-                  </button>
-                </div>
-              ))}
+              ) : (
+                <p className="announcement-empty">No announcements</p>
+              )}
             </div>
           </div>
         </section>
       )}
 
-      <div className="power-pill">
-        <span className="power-bolt"></span>
-        Powered by Netlify
-      </div>
+      {taskModal && (
+        <TaskForm
+          task={taskModal.id ? taskModal : null}
+          onSave={handleSaveTask}
+          onCancel={() => setTaskModal(null)}
+        />
+      )}
+
+      {announcementModal && (
+        <AnnouncementForm
+          announcement={announcementModal.id ? announcementModal : null}
+          onSave={handleSaveAnnouncement}
+          onCancel={() => setAnnouncementModal(null)}
+        />
+      )}
+
     </div>
   )
 }
