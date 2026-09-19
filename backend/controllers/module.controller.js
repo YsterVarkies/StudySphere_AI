@@ -1,8 +1,12 @@
-const getModules = (req, res) => {
+const Module = require("../models/module.model");
+
+const getModules = async (req, res) => {
     try {
+        const modules = await Module.getAllModules();
+
         return res.status(200).json({
             message: "Modules retrieved successfully.",
-            modules: []
+            modules
         });
 
     } catch (error) {
@@ -14,12 +18,12 @@ const getModules = (req, res) => {
     }
 };
 
-
-const createModule = (req, res) => {
+const createModule = async (req, res) => {
     try {
         const {
             module_code,
-            module_name
+            module_name,
+            description
         } = req.body;
 
         // Check required fields
@@ -29,11 +33,19 @@ const createModule = (req, res) => {
             });
         }
 
+        const result = await Module.createModule(
+            module_code,
+            module_name,
+            description || null
+        );
+
         return res.status(201).json({
-            message: "Module validation successful.",
+            message: "Module created successfully.",
             module: {
+                module_id: result.insertId,
                 module_code,
-                module_name
+                module_name,
+                description: description || null
             }
         });
 
@@ -45,7 +57,6 @@ const createModule = (req, res) => {
         });
     }
 };
-
 
 module.exports = {
     getModules,
