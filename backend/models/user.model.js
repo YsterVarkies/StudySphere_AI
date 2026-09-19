@@ -15,7 +15,7 @@ const getAllUsers = async () => {
             role,
             is_active,
             created_at
-        FROM user
+        FROM \`USER\`
     `);
 
     return rows;
@@ -33,7 +33,7 @@ const getUserById = async (userId) => {
             role,
             is_active,
             created_at
-        FROM user
+        FROM \`USER\`
         WHERE user_id = ?
     `, [userId]);
 
@@ -43,7 +43,7 @@ const getUserById = async (userId) => {
 // Update a user's role
 const updateUserRole = async (userId, role) => {
     const [result] = await db.query(
-        `UPDATE user
+        `UPDATE \`USER\`
          SET role = ?
          WHERE user_id = ?`,
         [role, userId]
@@ -55,7 +55,7 @@ const updateUserRole = async (userId, role) => {
 // Activate or deactivate a user account
 const updateUserStatus = async (userId, isActive) => {
     const [result] = await db.query(
-        `UPDATE user
+        `UPDATE \`USER\`
          SET is_active = ?
          WHERE user_id = ?`,
         [isActive, userId]
@@ -64,9 +64,55 @@ const updateUserStatus = async (userId, isActive) => {
     return result;
 };
 
+// Create a new user
+const createUser = async (
+    cohortId,
+    firstName,
+    lastName,
+    email,
+    passwordHash
+) => {
+    const [result] = await db.query(
+        `INSERT INTO \`USER\`
+        (cohort_id, first_name, last_name, email, password_hash, role, is_active)
+        VALUES (?, ?, ?, ?, ?, 'student', 1)`,
+        [
+            cohortId,
+            firstName,
+            lastName,
+            email,
+            passwordHash
+        ]
+    );
+
+    return result;
+};
+
+// Find a user by email for login
+const findUserByEmail = async (email) => {
+    const [rows] = await db.query(
+        `SELECT
+            user_id,
+            cohort_id,
+            first_name,
+            last_name,
+            email,
+            password_hash,
+            role,
+            is_active
+        FROM \`USER\`
+        WHERE email = ?`,
+        [email]
+    );
+
+    return rows[0];
+};
+
 module.exports = {
     getAllUsers,
     getUserById,
     updateUserRole,
-    updateUserStatus
+    updateUserStatus,
+    createUser,
+    findUserByEmail
 };
