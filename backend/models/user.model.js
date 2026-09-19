@@ -15,7 +15,7 @@ const getAllUsers = async () => {
             role,
             is_active,
             created_at
-        FROM user
+        FROM \`USER\`
     `);
 
     return rows;
@@ -33,7 +33,7 @@ const getUserById = async (userId) => {
             role,
             is_active,
             created_at
-        FROM user
+        FROM \`USER\`
         WHERE user_id = ?
     `, [userId]);
 
@@ -43,7 +43,7 @@ const getUserById = async (userId) => {
 // Update a user's role
 const updateUserRole = async (userId, role) => {
     const [result] = await db.query(
-        `UPDATE user
+        `UPDATE \`USER\`
          SET role = ?
          WHERE user_id = ?`,
         [role, userId]
@@ -55,7 +55,7 @@ const updateUserRole = async (userId, role) => {
 // Activate or deactivate a user account
 const updateUserStatus = async (userId, isActive) => {
     const [result] = await db.query(
-        `UPDATE user
+        `UPDATE \`USER\`
          SET is_active = ?
          WHERE user_id = ?`,
         [isActive, userId]

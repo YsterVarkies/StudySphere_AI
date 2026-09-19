@@ -2,14 +2,9 @@ const bcrypt = require("bcrypt");
 const User = require("../models/user.model");
 const jwt = require("jsonwebtoken");
 
-const testAuth = (req, res) => {
-    res.json({
-        message: "Authentication controller is working!"
-    });
-};
+
 
 const register = async (req, res) => {
-    console.log("REGISTER CONTROLLER VERSION 2");
     try {
         const {
             first_name,
@@ -170,8 +165,22 @@ const login = async (req, res) => {
     }
 };
 
+const logout = (req, res) => {
+    try {
+        return res.status(200).json({
+            message: "Logout successful."
+        });
+    } catch (error) {
+        console.error("Logout error:", error);
+
+        return res.status(500).json({
+            message: "Server error during logout."
+        });
+    }
+};
+
 module.exports = {
-    testAuth,
     register,
-    login
+    login,
+    logout
 };
