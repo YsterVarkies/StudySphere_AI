@@ -27,7 +27,7 @@ const documentRoutes = require("./routes/document.routes");
 const plannerRoutes = require("./routes/planner.routes");
 const cohortRoutes = require("./routes/cohort.routes");
 const moduleRoutes = require("./routes/module.routes");
-
+const userRoutes = require("./routes/user.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
@@ -35,6 +35,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/planner", plannerRoutes);
 app.use("/api/cohorts", cohortRoutes);
 app.use("/api/modules", moduleRoutes);
+app.use("/api/admin/users", userRoutes);
 
 // Dev 2 Routes
 const flashcardRoutes = require('./src/routes/flashcard.routes');
