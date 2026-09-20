@@ -1,7 +1,7 @@
 // User Model
 // Handles all database queries related to users
 
-const db = require('../config/db'); //We need to setup a connection to the MySQL to enable DB connection
+const db = require('../config/db'); 
 
 // Get all users
 const getAllUsers = async () => {
