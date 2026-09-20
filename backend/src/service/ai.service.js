@@ -85,4 +85,4 @@ module.exports = {
   chat,
   generateQuiz,
   generateFlashcards,
-};s
+};

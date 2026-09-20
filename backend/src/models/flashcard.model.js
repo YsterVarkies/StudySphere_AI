@@ -1,4 +1,4 @@
-const db = require('../../config/db'); // ← correct path from src/models/
+const db = require('../../config/db');
 
 const Flashcard = {
   async createSetWithCards({ userId, moduleId, documentId, title, cards }) {

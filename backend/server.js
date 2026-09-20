@@ -28,12 +28,19 @@ const plannerRoutes = require("./routes/planner.routes");
 const cohortRoutes = require("./routes/cohort.routes");
 const moduleRoutes = require("./routes/module.routes");
 
+
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/planner", plannerRoutes);
 app.use("/api/cohorts", cohortRoutes);
 app.use("/api/modules", moduleRoutes);
+
+// Dev 2 Routes
+const flashcardRoutes = require('./src/routes/flashcard.routes');
+app.use('/api/flashcards', flashcardRoutes);
+const announcementRoutes = require('./src/routes/announcement.routes');
+app.use('/api/announcements', announcementRoutes);
 
 // Test route
 app.get("/", (req, res) => {
