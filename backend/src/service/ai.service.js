@@ -1,7 +1,5 @@
 require('dotenv').config();
 
-const PROVIDER = 'openai'; // ← using OpenAI
-
 const OpenAI = require('openai');
 
 const openai = new OpenAI({
@@ -81,8 +79,32 @@ ${text}
   return JSON.parse(completion.choices[0].message.content);
 }
 
+async function generateSummary(text) {
+  const prompt = `
+Summarize the following study material clearly and concisely for a university student.
+Return ONLY valid JSON in this exact format:
+{
+  "title": "Short summary title",
+  "summary": "The full summary text here"
+}
+
+Study material:
+${text}
+`;
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' },
+    temperature: 0.3,
+  });
+
+  return JSON.parse(completion.choices[0].message.content);
+}
+
 module.exports = {
   chat,
   generateQuiz,
   generateFlashcards,
+  generateSummary,
 };

@@ -1,6 +1,6 @@
 const Flashcard = require('../models/flashcard.model');
 const aiService = require('../service/ai.service');
-const db = require('../../config/db'); // ← correct path from src/controllers/
+const db = require('../../config/db');
 
 exports.generateFlashcards = async (req, res) => {
   try {
@@ -36,7 +36,7 @@ exports.generateFlashcards = async (req, res) => {
     // 2. Get extracted text
     //    Adjust this if your table/column is different
     const [textRows] = await db.execute(
-      `SELECT extracted_text FROM DOCUMENT_TEXT WHERE document_id = ?`,
+      `SELECT extracted_text FROM document_text WHERE document_id = ?`,
       [documentId]
     );
 
@@ -57,14 +57,18 @@ exports.generateFlashcards = async (req, res) => {
     let aiResult;
     try {
       aiResult = await aiService.generateFlashcards(studyText, numberOfCards);
-    } catch (aiError) {
-      console.error('AI generation failed:', aiError);
-      return res.status(502).json({
+   } catch (aiError) {
+    console.error('AI generation failed');
+    console.error('Message:', aiError.message);
+    console.error('Status:', aiError.status);
+    console.error('Response:', aiError.response?.data);
+
+    return res.status(502).json({
         success: false,
         message: 'Failed to generate flashcards from AI service',
-        error: process.env.NODE_ENV === 'development' ? aiError.message : undefined,
-      });
-    }
+        error: aiError.message
+    });
+}
 
     if (!aiResult?.flashcards || !Array.isArray(aiResult.flashcards) || aiResult.flashcards.length === 0) {
       return res.status(500).json({
