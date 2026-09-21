@@ -37,12 +37,6 @@ app.use("/api/cohorts", cohortRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api/admin/users", userRoutes);
 
-// Dev 2 Routes
-const flashcardRoutes = require('./src/routes/flashcard.routes');
-app.use('/api/flashcards', flashcardRoutes);
-const announcementRoutes = require('./src/routes/announcement.routes');
-app.use('/api/announcements', announcementRoutes);
-
 // Test route
 app.get("/", (req, res) => {
     res.json({
