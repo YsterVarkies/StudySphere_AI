@@ -1049,6 +1049,14 @@ function App() {
               )}
             </section>
           </section>
+          
+        ): activeNav === 'study-materials' ? (
+          <StudyMaterials />
+        ): activeNav === 'ai-chat' ? (
+          <AIChat />
+        ): activeNav === 'revision' ? (
+          <RevisionHub />
+
         ) : activeNav === 'analytics' ? (
           <AnalyticsDashboard />
         ) : activeNav === 'users' ? (
