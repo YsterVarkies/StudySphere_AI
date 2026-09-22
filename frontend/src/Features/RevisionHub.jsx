@@ -204,7 +204,7 @@ function RevisionHub() {
                     <button
                     type="button"
                     onClick={() => generate("flashcards")}
-                    disabled={laoding}
+                    disabled={loading}
                     >
                         {
                             loading && mode === "flashcards"
@@ -258,7 +258,7 @@ function RevisionHub() {
                                             type="button"
                                             key={optionIndex}
                                             className= {
-                                                selctedAnswer === optionIndex
+                                                selectedAnswer === optionIndex
                                                 ? "revision-hub-page__option revision-hub-page__option--selected"
                                                 : "revision-hub-page__option"
                                             } 

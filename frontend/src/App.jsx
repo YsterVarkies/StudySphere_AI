@@ -1,6 +1,9 @@
 import UserManagement from './components/UserManagement'
 import AnalyticsDashboard from './components/AnalyticsDashboard'
 import ModulesAndCohorts from './components/ModulesAndCohorts'
+import StudyMaterials from './Features/StudyMaterials'
+import AIChat from './Features/AIChat'
+import RevisionHub from './Features/RevisionHub'
 import { useEffect, useState } from 'react'
 import './App.css'
 
@@ -753,18 +756,30 @@ function App() {
               <span className="nav-icon grid"></span>
               Dashboard
             </button>
-            <button className="nav-item" type="button">
+            <button className={`nav-item ${activeNav === 'study-materials' ? 'active' : ''}`}
+            type="button"
+            onClick={() => setActiveNav('study-materials')}
+            >
               <span className="nav-icon folder"></span>
               Study materials
             </button>
-            <button className="nav-item" type="button">
+
+            <button className={`nav-item ${activeNav === 'ai-chat' ? 'active' : ''}`}
+            type="button"
+            onClick={() => setActiveNav('ai-chat')}
+            >
               <span className="nav-icon chat"></span>
               AI chat assistant
             </button>
-            <button className="nav-item" type="button">
+
+            <button className={`nav-item ${activeNav === 'revision' ? 'active' : ''}`}
+            type="button"
+            onClick={() => setActiveNav('revision')}
+            >
               <span className="nav-icon revision"></span>
               Revision hub
             </button>
+
             <button
               className={`nav-item ${activeNav === 'planner' ? 'active' : ''}`}
               type="button"
@@ -937,6 +952,16 @@ function App() {
               </section>
             )}
           </section>
+
+        ): activeNav === 'study-materials' ? (
+          <StudyMaterials />
+
+        ) : activeNav === 'ai-chat' ? (
+          <AIChat />
+
+        ): activeNav === 'revision' ? (
+          <RevisionHub />
+
         ) : activeNav === 'planner' ? (
           <section className="planner-view focused">
             <header className="planner-header">

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"; 
 import "./StudyMaterials.css"; // Import the CSS file for styling
 
-const API_URL = "https://localhost:5173/api"; // Replace with your actual API URL
+const API_URL = "https://localhost:5000/api"; // Replace with your actual API URL
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
 const ALLOWED_TYPES = [
