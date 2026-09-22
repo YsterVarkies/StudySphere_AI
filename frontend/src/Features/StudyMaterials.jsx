@@ -184,7 +184,7 @@ return (
         <div className= "study-materials-page__header">
             <div>
                 <h1>Study Materials</h1>
-                <p>Upload and manage your study materials here.</p>
+                <p>Upload and manage your study materials here.</p> 
                 </div>
             </div>
 
