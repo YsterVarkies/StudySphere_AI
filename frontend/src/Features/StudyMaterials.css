@@ -1,0 +1,153 @@
+.study-materials-page {
+  padding: 32px;
+  color: #0a203d;
+}
+
+.study-materials-page__header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.study-materials-page__header h1 {
+  margin: 0;
+}
+
+.study-materials-page__header p {
+  margin-top: 8px;
+  color: #64748b;
+}
+
+.study-materials-page__upload {
+  padding: 24px;
+  margin-bottom: 24px;
+  background: #ffffff;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+}
+
+.study-materials-page__upload h2 {
+  margin-top: 0;
+}
+
+.study-materials-page__button,
+.study-materials-page__upload {
+  font: inherit;
+}
+
+.study-materials-page__button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 7px;
+  background: #e07a19;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.study-materials-page__module {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 18px 0;
+  max-width: 400px;
+}
+
+.study-materials-page__module input,
+.study-materials-page__module select,
+.study-materials-page__controls input,
+.study-materials-page__controls select {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font: inherit;
+}
+
+.study-materials-page__upload {
+  background: #0a203d;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 11px 18px;
+}
+
+.study-materials-page__upload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.study-materials-page__selected {
+  display: flex;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.study-materials-page__selected span {
+  color: #64748b;
+}
+
+.study-materials-page__error,
+.study-materials-page__success {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.study-materials-page__error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.study-materials-page__success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.study-materials-page__controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.study-materials-page__controls input {
+  flex: 1;
+}
+
+.study-materials-page__documents {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.study-materials-page__document {
+  display: flex;
+  gap: 15px;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.study-materials-page__document-icon {
+  font-size: 30px;
+}
+
+.study-materials-page__document-info h3 {
+  margin: 0 0 8px;
+  word-break: break-word;
+}
+
+.study-materials-page__document-info p {
+  margin: 0 0 6px;
+  color: #64748b;
+}
+
+.study-materials-page__document-info span {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.study-materials-page__empty {
+  text-align: center;
+  padding: 50px;
+  color: #64748b;
+}
