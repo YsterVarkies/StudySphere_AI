@@ -1793,6 +1793,205 @@ h1 {
   }
 }
 
+.dashboard-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.dashboard-overview-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.dashboard-overview-header .date-line {
+  font-size: 0.92rem;
+  margin-bottom: 7px;
+}
+
+.dashboard-overview-header h1 {
+  font-size: 2.15rem;
+}
+
+.dashboard-announcements,
+.dashboard-list-card {
+  background: #ffffff;
+  border-color: rgba(66, 83, 98, 0.13);
+  box-shadow: 0 7px 20px rgba(38, 56, 70, 0.06);
+}
+
+.dashboard-announcements {
+  padding: 20px 22px 8px;
+}
+
+.dashboard-announcements h2,
+.dashboard-list-card h2,
+.dashboard-stat-card h2 {
+  margin: 0;
+  color: #1f2e3d;
+  font-size: 1.08rem;
+  letter-spacing: -0.025em;
+}
+
+.dashboard-announcement-row,
+.dashboard-deadline-row,
+.dashboard-document-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  padding: 15px 2px;
+  border-top: 1px solid rgba(52, 75, 92, 0.12);
+}
+
+.dashboard-announcement-row:first-of-type {
+  margin-top: 10px;
+}
+
+.dashboard-announcement-row > div,
+.dashboard-list-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.dashboard-announcement-row strong,
+.dashboard-list-copy strong {
+  display: block;
+  overflow: hidden;
+  color: #263f53;
+  font-size: 0.94rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-announcement-row p,
+.dashboard-list-copy small,
+.dashboard-stat-card p {
+  margin: 4px 0 0;
+  color: #748493;
+  font-size: 0.82rem;
+}
+
+.dashboard-category-tag,
+.dashboard-status-pill {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.dashboard-category-tag.campus { background: #d9eee5; color: #2e6d5e; }
+.dashboard-category-tag.module { background: #f3e4c5; color: #7a5c2c; }
+
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.dashboard-stat-card {
+  min-height: 132px;
+  padding: 19px 20px 16px;
+  background: #ffffff;
+  border-color: rgba(66, 83, 98, 0.13);
+  box-shadow: 0 7px 20px rgba(38, 56, 70, 0.06);
+}
+
+.dashboard-stat-card strong {
+  display: block;
+  margin-top: 13px;
+  color: #1d2d3e;
+  font-size: 2.25rem;
+  line-height: 1;
+}
+
+.dashboard-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.dashboard-list-card {
+  min-width: 0;
+  padding: 19px 20px 9px;
+}
+
+.dashboard-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+
+.dashboard-card-heading > span {
+  color: #70818d;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.dashboard-deadline-icon,
+.dashboard-file-icon {
+  display: grid;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.dashboard-deadline-icon.assignment,
+.dashboard-status-pill.assignment { background: #d9eee5; color: #2e6d5e; }
+.dashboard-deadline-icon.exam,
+.dashboard-status-pill.exam { background: #f6ded8; color: #a34f42; }
+.dashboard-deadline-icon.study,
+.dashboard-status-pill.study { background: #e4e0f2; color: #66558f; }
+
+.dashboard-status-pill { padding: 5px 9px; }
+
+.dashboard-file-icon.pdf { background: #f6ded8; color: #a34f42; }
+.dashboard-file-icon.docx { background: #dce8f4; color: #3e668e; }
+.dashboard-file-icon.txt { background: #e5eee8; color: #4f725d; }
+
+.dashboard-comment-icon {
+  color: #78909b;
+  font-size: 1.15rem;
+}
+
+.dashboard-empty-state {
+  margin: 16px 2px;
+  color: #748493;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 760px) {
+  .dashboard-overview-header,
+  .dashboard-bottom-grid {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .dashboard-overview-header .planner-button {
+    width: 100%;
+  }
+
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-announcement-row,
+  .dashboard-deadline-row,
+  .dashboard-document-row {
+    align-items: flex-start;
+  }
+}
+
 /* Login palette and layout use the shared StudySphere design tokens. */
 .login-screen {
   --ss-bg: #faf6ee;
