@@ -104,6 +104,33 @@ function clearSession() {
   }
 }
 
+const dashboardEmptyState = {
+  activeModules: { count: 0, cohortCount: 0, items: [] },
+  upcomingDeadlines: { count: 0, items: [] },
+  aiQuestionsThisWeek: { count: 0, weeklyLimit: 20 },
+  recentDocuments: [],
+  announcements: [],
+}
+
+async function loadDashboardData(token) {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+  const response = await fetch(`${apiUrl}/dashboard`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!response.ok) throw new Error('Dashboard data could not be loaded.')
+  const result = await response.json()
+  return result.dashboard || dashboardEmptyState
+}
+
+async function refreshDashboardForUser(user) {
+  if (!user) return dashboardEmptyState
+  try {
+    return await loadDashboardData(user.token)
+  } catch {
+    return dashboardEmptyState
+  }
+}
+
 function formatTaskDate(task) {
   if (!task.date) return 'No date set'
   const taskDate = new Date(`${task.date}T${task.time || '00:00'}`)
@@ -358,6 +385,116 @@ function AnnouncementItem({ announcement, onEdit, onDelete, showActions = false 
         </div>
       )}
     </article>
+  )
+}
+
+function DashboardOverview({
+  currentUser,
+  sessionDate,
+  dashboardData,
+  onAddTask,
+  upcomingTasks,
+  todayTasks,
+  pastTasks,
+  onEditTask,
+  onDeleteTask,
+  onToggleTask,
+}) {
+  const { activeModules, upcomingDeadlines, aiQuestionsThisWeek, recentDocuments, announcements } = dashboardData
+  const [currentTime] = useState(() => Date.now())
+  const formatFileSize = (bytes) => bytes < 1024 * 1024
+    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  const formatDeadline = (dueAt) => new Date(dueAt).toLocaleString('en-US', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  return (
+    <section className="dashboard-overview">
+      <header className="dashboard-overview-header">
+        <div>
+          <p className="date-line">{sessionDate}</p>
+          <h1>Welcome back, {currentUser.firstName}</h1>
+        </div>
+        <button className="planner-button" type="button" onClick={onAddTask}>
+          <span className="plus">+</span> Add planner task
+        </button>
+      </header>
+
+      <section className="dashboard-announcements panel">
+        <h2>Announcements</h2>
+        {announcements.length ? announcements.map((announcement) => (
+          <article className="dashboard-announcement-row" key={announcement.id}>
+            <span className={`dashboard-category-tag ${announcement.category === 'Campus-wide' ? 'campus' : 'module'}`}>
+              {announcement.category}
+            </span>
+            <div>
+              <strong>{announcement.title}</strong>
+              <p>{announcement.message}</p>
+            </div>
+          </article>
+        )) : <p className="dashboard-empty-state">No announcements right now.</p>}
+      </section>
+
+      <section className="dashboard-stats" aria-label="Study statistics">
+        <article className="dashboard-stat-card panel">
+          <h2>Active modules</h2>
+          <strong>{activeModules.count}</strong>
+          <p>Across {activeModules.cohortCount} cohort{activeModules.cohortCount === 1 ? '' : 's'}</p>
+        </article>
+        <article className="dashboard-stat-card panel">
+          <h2>Upcoming deadlines</h2>
+          <strong>{upcomingDeadlines.count}</strong>
+          <p>{upcomingDeadlines.items.filter((item) => (new Date(item.dueAt).getTime() - currentTime) <= 48 * 60 * 60 * 1000).length} due within 48 hours</p>
+        </article>
+        <article className="dashboard-stat-card panel">
+          <h2>AI questions this week</h2>
+          <strong>{aiQuestionsThisWeek.count}</strong>
+          <p>of {aiQuestionsThisWeek.weeklyLimit} weekly limit</p>
+        </article>
+      </section>
+
+      <section className="dashboard-bottom-grid">
+        <article className="dashboard-list-card panel">
+          <div className="dashboard-card-heading"><h2>Upcoming deadlines</h2><span>{upcomingDeadlines.count}</span></div>
+          {upcomingDeadlines.items.length ? upcomingDeadlines.items.map((deadline) => (
+            <div className="dashboard-deadline-row" key={deadline.id}>
+              <span className={`dashboard-deadline-icon ${deadline.type}`}>{deadline.type.charAt(0).toUpperCase()}</span>
+              <div className="dashboard-list-copy"><strong>{deadline.module ? `${deadline.module} — ` : ''}{deadline.title}</strong><small>Due {formatDeadline(deadline.dueAt)}</small></div>
+              <span className={`dashboard-status-pill ${deadline.type}`}>{deadline.type}</span>
+            </div>
+          )) : <p className="dashboard-empty-state">You&apos;re all caught up.</p>}
+        </article>
+
+        <article className="dashboard-list-card panel">
+          <div className="dashboard-card-heading"><h2>Recent documents</h2><span>{recentDocuments.length}</span></div>
+          {recentDocuments.length ? recentDocuments.map((document) => (
+            <div className="dashboard-document-row" key={document.id}>
+              <span className={`dashboard-file-icon ${document.fileType.toLowerCase()}`}>{document.fileType.toUpperCase()}</span>
+              <div className="dashboard-list-copy"><strong>{document.fileName}</strong><small>{document.module || 'Unassigned module'} · {formatFileSize(document.fileSizeBytes)}</small></div>
+              <span className="dashboard-comment-icon" aria-hidden="true">▢</span>
+            </div>
+          )) : <p className="dashboard-empty-state">No documents yet.</p>}
+        </article>
+      </section>
+
+      <section className="dashboard-task-grid">
+        <div className="task-panel panel">
+          <div className="section-heading-row"><h2>Upcoming tasks</h2><span className="section-count">{upcomingTasks.length}</span></div>
+          {upcomingTasks.length ? <ul className="task-list">{upcomingTasks.map((task) => <TaskItem key={task.id} task={task} onEdit={onEditTask} onDelete={onDeleteTask} onToggle={onToggleTask} />)}</ul> : <div className="empty-state"><strong>No upcoming tasks</strong><p>Add a study task to start planning.</p></div>}
+        </div>
+        <div className="task-panel panel">
+          <div className="section-heading-row"><h2>Today&apos;s tasks</h2><span className="section-count">{todayTasks.length}</span></div>
+          {todayTasks.length ? <ul className="task-list">{todayTasks.map((task) => <TaskItem key={task.id} task={task} onEdit={onEditTask} onDelete={onDeleteTask} onToggle={onToggleTask} />)}</ul> : <div className="empty-state"><strong>No tasks scheduled for today.</strong><p>Your day is clear.</p></div>}
+        </div>
+        {pastTasks.length > 0 && <div className="task-panel panel past-task-panel"><div className="section-heading-row"><h2>Past tasks</h2><span className="section-count">{pastTasks.length}</span></div><ul className="task-list">{pastTasks.map((task) => <TaskItem key={task.id} task={task} onEdit={onEditTask} onDelete={onDeleteTask} onToggle={onToggleTask} />)}</ul></div>}
+      </section>
+    </section>
   )
 }
 
@@ -626,6 +763,7 @@ function App() {
   const [taskModal, setTaskModal] = useState(null)
   const [announcementModal, setAnnouncementModal] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
+  const [dashboardData, setDashboardData] = useState(dashboardEmptyState)
 
   useEffect(() => {
     if (!successMessage) return undefined
@@ -633,6 +771,19 @@ function App() {
     const timeoutId = window.setTimeout(() => setSuccessMessage(''), 3500)
     return () => window.clearTimeout(timeoutId)
   }, [successMessage])
+
+  useEffect(() => {
+    let cancelled = false
+    refreshDashboardForUser(user).then((nextDashboardData) => {
+      if (!cancelled) setDashboardData(nextDashboardData)
+    })
+    const handleWindowFocus = () => refreshDashboardForUser(user).then(setDashboardData)
+    window.addEventListener('focus', handleWindowFocus)
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', handleWindowFocus)
+    }
+  }, [user, activeNav])
 
   function handleLogin({ firstName, surname, email, studentNumber }) {
     const date = new Date()
@@ -679,6 +830,7 @@ function App() {
       ? tasks.map((task) => (task.id === taskData.id ? { ...task, ...taskData } : task))
       : [{ ...taskData, id: `${Date.now()}-${Math.random()}`, completed: false }, ...tasks]
     updateTasks(nextTasks)
+    refreshDashboardForUser(user).then(setDashboardData)
     setTaskModal(null)
   }
 
@@ -726,9 +878,6 @@ function App() {
   const surname = currentUser.surname?.trim() || ''
   const initials = `${firstName.charAt(0)}${surname.charAt(0)}`.toUpperCase()
   const fullName = `${firstName}${surname ? ` ${surname}` : ''}`
-  const completedTasks = tasks.filter((task) => getTaskStatus(task) === 'completed')
-  const overdueTasks = tasks.filter((task) => getTaskStatus(task) === 'overdue')
-  const pendingTasks = tasks.filter((task) => getTaskStatus(task) !== 'completed')
   const upcomingTasks = sortTasksByDate(tasks.filter((task) => ['today', 'upcoming'].includes(getTaskStatus(task))))
   const todayTasks = sortTasksByDate(tasks.filter((task) => getTaskStatus(task) === 'today'))
   const pastTasks = sortTasksByDate(tasks.filter((task) => ['overdue', 'completed'].includes(getTaskStatus(task))))
@@ -835,108 +984,18 @@ function App() {
         </div>
 
         {activeNav === 'dashboard' ? (
-          <section className="dashboard-view focused">
-            <header className="topbar">
-              <div className="heading-wrap">
-                <p className="date-line">{sessionDate}</p>
-                <h1>Welcome, {currentUser.firstName}</h1>
-              </div>
-
-              <button className="planner-button" type="button" onClick={() => setTaskModal(emptyTask)}>
-                <span className="plus">+</span> Add planner task
-              </button>
-            </header>
-
-            <section className="announcement-card panel">
-              <h2>Announcements</h2>
-              {announcements.length > 0 ? (
-                <div className="announcement-list">
-                  {announcements.map((item) => (
-                    <AnnouncementItem key={item.id} announcement={item} />
-                  ))}
-                </div>
-              ) : (
-                <p className="announcement-empty">No announcements</p>
-              )}
-            </section>
-
-            <section className="metric-grid">
-              <div className="metric-card panel">
-                <h3>Total tasks</h3>
-                <div className="metric-value">{tasks.length}</div>
-                <p>{tasks.length ? 'Created by you' : 'No tasks yet'}</p>
-              </div>
-              <div className="metric-card panel">
-                <h3>Completed</h3>
-                <div className="metric-value">{completedTasks.length}</div>
-                <p>{completedTasks.length ? 'Finished tasks' : 'None completed'}</p>
-              </div>
-              <div className="metric-card panel">
-                <h3>Pending</h3>
-                <div className="metric-value">{pendingTasks.length}</div>
-                <p>{pendingTasks.length ? 'Still to do' : 'Nothing pending'}</p>
-              </div>
-              <div className="metric-card panel">
-                <h3>Overdue</h3>
-                <div className="metric-value">{overdueTasks.length}</div>
-                <p>{overdueTasks.length ? 'Needs attention' : 'Nothing overdue'}</p>
-              </div>
-            </section>
-
-            <section className="dashboard-task-grid">
-              <div className="task-panel panel">
-                <div className="section-heading-row">
-                  <h2>Upcoming tasks</h2>
-                  <span className="section-count">{upcomingTasks.length}</span>
-                </div>
-                {upcomingTasks.length ? (
-                  <ul className="task-list">
-                    {upcomingTasks.map((task) => (
-                      <TaskItem key={task.id} task={task} onEdit={setTaskModal} onDelete={handleDeleteTask} onToggle={handleToggleTask} />
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="empty-state">
-                    <strong>No upcoming tasks</strong>
-                    <p>Add a study task to start planning.</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="task-panel panel">
-                <div className="section-heading-row">
-                  <h2>Today&apos;s tasks</h2>
-                  <span className="section-count">{todayTasks.length}</span>
-                </div>
-                {todayTasks.length ? (
-                  <ul className="task-list">
-                    {todayTasks.map((task) => (
-                      <TaskItem key={task.id} task={task} onEdit={setTaskModal} onDelete={handleDeleteTask} onToggle={handleToggleTask} />
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="empty-state">
-                    <strong>No tasks scheduled for today.</strong>
-                    <p>Your day is clear.</p>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {pastTasks.length > 0 && (
-              <section className="task-panel panel past-task-panel">
-                <div className="section-heading-row">
-                  <h2>Past tasks</h2>
-                  <span className="section-count">{pastTasks.length}</span>
-                </div>
-                <ul className="task-list">
-                  {pastTasks.map((task) => (
-                    <TaskItem key={task.id} task={task} onEdit={setTaskModal} onDelete={handleDeleteTask} onToggle={handleToggleTask} />
-                  ))}
-                </ul>
-              </section>
-            )}
-          </section>
+          <DashboardOverview
+            currentUser={currentUser}
+            sessionDate={sessionDate}
+            dashboardData={dashboardData}
+            onAddTask={() => setTaskModal(emptyTask)}
+            upcomingTasks={upcomingTasks}
+            todayTasks={todayTasks}
+            pastTasks={pastTasks}
+            onEditTask={setTaskModal}
+            onDeleteTask={handleDeleteTask}
+            onToggleTask={handleToggleTask}
+          />
         ) : activeNav === 'planner' ? (
           <section className="planner-view focused">
             <header className="planner-header">
