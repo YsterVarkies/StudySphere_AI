@@ -1,13 +1,12 @@
-const getDashboard = (req, res) => {
+const Dashboard = require("../models/dashboard.model");
+
+const getDashboard = async (req, res) => {
     try {
+        const dashboard = await Dashboard.getDashboardData(req.user);
+
         return res.status(200).json({
             message: "Dashboard data retrieved successfully.",
-            dashboard: {
-                upcoming_deadlines: [],
-                recent_activity: [],
-                modules: [],
-                announcements: []
-            }
+            dashboard
         });
 
     } catch (error) {
