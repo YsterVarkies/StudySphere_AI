@@ -14,8 +14,14 @@ async function chat(question, context = '') {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
-      { role: 'system', content: 'You are a helpful academic assistant for university students.' },
-      { role: 'user', content: prompt },
+      {
+        role: 'system',
+        content: 'You are a helpful academic assistant for university students.',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
     ],
     temperature: 0.4,
   });

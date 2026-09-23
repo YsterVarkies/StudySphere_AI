@@ -1,4 +1,4 @@
-/*const db = require('../../config/db');
+const db = require('../../config/db');
 
 const AiChat = {
   async createSession({ userId, moduleId, documentId, title }) {
@@ -81,4 +81,4 @@ const AiChat = {
   },
 };
 
-module.exports = AiChat;*/s
+module.exports = AiChat;
