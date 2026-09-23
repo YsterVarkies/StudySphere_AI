@@ -35,7 +35,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/planner", plannerRoutes);
 app.use("/api/cohorts", cohortRoutes);
 app.use("/api/modules", moduleRoutes);
-app.use("/api/admin/users", userRoutes);
+app.use("/api/users", userRoutes);
 
 // Test route
 app.get("/", (req, res) => {
