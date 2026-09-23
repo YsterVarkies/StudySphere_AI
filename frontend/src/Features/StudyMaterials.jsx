@@ -187,7 +187,7 @@ function StudyMaterials() {
                     className="study-materials-page__upload-top-btn"
                     onClick={() => fileInputRef.current.click()} 
                 >
-                    📤 Upload document
+                    +  Upload document
                 </button>
             </header>
             <input
