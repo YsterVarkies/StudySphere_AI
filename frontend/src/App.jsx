@@ -1,6 +1,7 @@
 import UserManagement from './components/UserManagement'
 import AnalyticsDashboard from './components/AnalyticsDashboard'
 import ModulesAndCohorts from './components/ModulesAndCohorts'
+import { loginUser, registerUser } from './services/auth.service'
 import StudyMaterials from './Features/StudyMaterials'
 import AIChat from './Features/AIChat'
 import RevisionHub from './Features/RevisionHub'
@@ -70,30 +71,18 @@ function saveAnnouncements(email, announcementsToSave) {
   }
 }
 
-function loadUsers() {
-  try {
-    const users = JSON.parse(localStorage.getItem('studysphere_users') || '{}')
-    return users && typeof users === 'object' ? users : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveUsers(users) {
-  localStorage.setItem('studysphere_users', JSON.stringify(users))
-}
-
 function loadSession() {
   try {
-    return JSON.parse(localStorage.getItem('studysphere_session') || 'null')
+    const session = JSON.parse(localStorage.getItem('studysphere_session') || 'null')
+    return session?.token && session?.user ? session : null
   } catch {
     return null
   }
 }
 
-function saveSession(user) {
+function saveSession(session) {
   try {
-    localStorage.setItem('studysphere_session', JSON.stringify(user))
+    localStorage.setItem('studysphere_session', JSON.stringify(session))
   } catch {
     // The in-memory session remains available if browser storage is unavailable.
   }
@@ -511,20 +500,21 @@ export function Login({ onLogin, onRegister, successMessage }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
-    const trimmedEmail = email.trim()
+    const normalizedEmail = email.trim().toLowerCase()
     const nextErrors = {}
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-    setEmail(trimmedEmail)
+    setEmail(normalizedEmail)
 
-    if (!trimmedEmail) {
+    if (!normalizedEmail) {
       nextErrors.email = 'Email is required'
-    } else if (!emailPattern.test(trimmedEmail)) {
+    } else if (!emailPattern.test(normalizedEmail)) {
       nextErrors.email = 'Please enter a valid email address'
     }
 
@@ -537,27 +527,19 @@ export function Login({ onLogin, onRegister, successMessage }) {
       return
     }
 
-    const storedUsers = loadUsers()
-    const storedUser = storedUsers[trimmedEmail.toLowerCase()]
-
-    if (!storedUser) {
-      setErrors({ email: 'Account not found. Please register before signing in.' })
-      return
-    }
-
-    const storedPassword = typeof storedUser === 'string' ? storedUser : storedUser.password
-    if (storedPassword !== password) {
-      setErrors({ password: 'Incorrect email or password.' })
-      return
-    }
-
     setErrors({})
-    onLogin({
-      firstName: storedUser.firstName || 'Student',
-      surname: storedUser.surname || '',
-      email: trimmedEmail,
-      studentNumber: storedUser.studentNumber || '',
-    })
+    setIsSubmitting(true)
+    try {
+      const authResponse = await loginUser({
+        email: normalizedEmail,
+        password,
+      })
+      onLogin(authResponse)
+    } catch (error) {
+      setErrors({ form: error.message || 'Unable to log in. Please try again.' })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -636,7 +618,8 @@ export function Login({ onLogin, onRegister, successMessage }) {
             {errors.password && <span className="login-error" role="alert">{errors.password}</span>}
           </label>
 
-          <button className="planner-button login-submit" type="submit">Log in</button>
+          {errors.form && <p className="login-error" role="alert">{errors.form}</p>}
+          <button className="planner-button login-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Logging in...' : 'Log in'}</button>
           <p className="auth-switch">Don&apos;t have an account? <button type="button" onClick={onRegister}>Register</button></p>
           <p className="login-footer">StudySphere · Student Portal</p>
         </form>
@@ -658,6 +641,7 @@ export function Registration({ onSignIn }) {
   })
   const [errors, setErrors] = useState({})
   const [success, setSuccess] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
@@ -665,12 +649,13 @@ export function Registration({ onSignIn }) {
     setFormData((current) => ({ ...current, [field]: value }))
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     const firstName = formData.firstName.trim()
     const surname = formData.surname.trim()
     const studentNumber = formData.studentNumber.trim()
     const email = formData.email.trim().toLowerCase()
+    const yearOfStudy = formData.yearOfStudy.trim()
     const nextErrors = {}
     const namePattern = /^[\p{L}][\p{L}\s'-]*[\p{L}]$/u
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -683,34 +668,47 @@ export function Registration({ onSignIn }) {
     if (!email) nextErrors.email = 'Please enter your email address.'
     else if (!emailPattern.test(email)) nextErrors.email = 'Please enter a valid email address.'
     if (!formData.password) nextErrors.password = 'Please create a password.'
-    else if (formData.password.length < 6) nextErrors.password = 'Password must be at least 6 characters.'
+    else if (formData.password.length < 8) nextErrors.password = 'Password must be at least 8 characters.'
+    else if (!/[A-Za-z]/.test(formData.password)) nextErrors.password = 'Password must contain at least one letter.'
+    else if (!/[0-9]/.test(formData.password)) nextErrors.password = 'Password must contain at least one number.'
     if (!formData.confirmPassword) nextErrors.confirmPassword = 'Please confirm your password.'
     else if (formData.password !== formData.confirmPassword) nextErrors.confirmPassword = 'Passwords do not match.'
-
-    const users = loadUsers()
-    if (users[email]) nextErrors.email = 'An account with this email already exists. Please sign in instead.'
-    else if (Object.values(users).some((user) => typeof user !== 'string' && user.studentNumber === studentNumber)) {
-      nextErrors.studentNumber = 'An account with this student number already exists.'
-    }
+    if (!yearOfStudy) nextErrors.yearOfStudy = 'Please select your year of study.'
+    else if (!Number.isInteger(Number(yearOfStudy))) nextErrors.yearOfStudy = 'Year of study must be a whole number.'
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
-    users[email] = {
-      firstName: firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase(),
-      surname,
-      studentNumber,
-      email,
-      password: formData.password,
-      programme: formData.programme.trim(),
-      yearOfStudy: formData.yearOfStudy,
-    }
-
+    setFormData((current) => ({ ...current, email }))
+    setIsSubmitting(true)
     try {
-      saveUsers(users)
+      await registerUser({
+        first_name: firstName,
+        last_name: surname,
+        student_number: studentNumber,
+        email,
+        password: formData.password,
+        year_of_study: Number(yearOfStudy),
+      })
       setSuccess(true)
-    } catch {
-      setErrors({ form: 'Unable to save your account in this browser. Please try again.' })
+    } catch (error) {
+      const fieldMap = {
+        first_name: 'firstName',
+        last_name: 'surname',
+        student_number: 'studentNumber',
+        email: 'email',
+        password: 'password',
+        year_of_study: 'yearOfStudy',
+      }
+      const formField = fieldMap[error.field]
+
+      if (formField) {
+        setErrors({ [formField]: error.message || 'Please check this field.' })
+      } else {
+        setErrors({ form: error.message || 'Unable to create your account. Please try again.' })
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -739,8 +737,8 @@ export function Registration({ onSignIn }) {
         <div className="registration-grid">{inputFields.map(([field, label, type, autoComplete]) => <label className="login-field" key={field}>{label}<span className="login-input-wrap"><input type={type} value={formData[field]} onChange={(event) => updateField(field, event.target.value)} autoComplete={autoComplete} /></span>{errors[field] && <span className="login-error" role="alert">{errors[field]}</span>}</label>)}</div>
         <label className="login-field">Password<span className="login-input-wrap"><input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={(event) => updateField('password', event.target.value)} autoComplete="new-password" /><button className="password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label="Toggle password visibility">◉</button></span>{errors.password && <span className="login-error" role="alert">{errors.password}</span>}</label>
         <label className="login-field">Confirm password<span className="login-input-wrap"><input type={showConfirmPassword ? 'text' : 'password'} value={formData.confirmPassword} onChange={(event) => updateField('confirmPassword', event.target.value)} autoComplete="new-password" /><button className="password-toggle" type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label="Toggle confirmation password visibility">◉</button></span>{errors.confirmPassword && <span className="login-error" role="alert">{errors.confirmPassword}</span>}</label>
-        <div className="registration-grid optional-fields"><label className="login-field">Course / Programme<input type="text" value={formData.programme} onChange={(event) => updateField('programme', event.target.value)} /></label><label className="login-field">Year of study<select value={formData.yearOfStudy} onChange={(event) => updateField('yearOfStudy', event.target.value)}><option value="">Select year</option><option>1</option><option>2</option><option>3</option><option>4+</option></select></label></div>
-        {errors.form && <p className="login-error" role="alert">{errors.form}</p>}<button className="planner-button login-submit" type="submit">Register</button><p className="auth-switch">Already have an account? <button type="button" onClick={onSignIn}>Sign in</button></p><p className="login-footer">StudySphere · Student Portal</p>
+        <div className="registration-grid optional-fields"><label className="login-field">Course / Programme<input type="text" value={formData.programme} onChange={(event) => updateField('programme', event.target.value)} /></label><label className="login-field">Year of study<select value={formData.yearOfStudy} onChange={(event) => updateField('yearOfStudy', event.target.value)}><option value="">Select year</option><option>1</option><option>2</option><option>3</option><option value="4">4+</option></select>{errors.yearOfStudy && <span className="login-error" role="alert">{errors.yearOfStudy}</span>}</label></div>
+        {errors.form && <p className="login-error" role="alert">{errors.form}</p>}<button className="planner-button login-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Creating account...' : 'Register'}</button><p className="auth-switch">Already have an account? <button type="button" onClick={onSignIn}>Sign in</button></p><p className="login-footer">StudySphere · Student Portal</p>
       </form></section>
     </main>
   )
@@ -749,9 +747,9 @@ export function Registration({ onSignIn }) {
 function App() {
   const [activeNav, setActiveNav] = useState('dashboard')
   const [authView, setAuthView] = useState('login')
-  const [user, setUser] = useState(loadSession)
+  const [user, setUser] = useState(() => loadSession()?.user || null)
   const [announcements, setAnnouncements] = useState(() => {
-    const restoredUser = loadSession()
+    const restoredUser = loadSession()?.user
     return restoredUser ? loadAnnouncements(restoredUser.email) : []
   })
   const [sessionDate, setSessionDate] = useState(() => new Date().toLocaleDateString('en-US', {
@@ -760,7 +758,7 @@ function App() {
     month: 'long',
   }))
   const [tasks, setTasks] = useState(() => {
-    const restoredUser = loadSession()
+    const restoredUser = loadSession()?.user
     return restoredUser ? loadTasks(restoredUser.email) : []
   })
   const [taskModal, setTaskModal] = useState(null)
@@ -788,7 +786,7 @@ function App() {
     }
   }, [user, activeNav])
 
-  function handleLogin({ firstName, surname, email, studentNumber }) {
+  function handleLogin({ token, user: backendUser }) {
     const date = new Date()
     const formattedDate = date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -796,14 +794,16 @@ function App() {
       month: 'long',
     })
     const authenticatedUser = {
-      firstName: firstName.trim(),
-      surname: surname.trim(),
-      email: email.toLowerCase(),
-      studentNumber,
+      user_id: backendUser.user_id,
+      firstName: backendUser.first_name?.trim() || 'Student',
+      surname: backendUser.last_name?.trim() || '',
+      email: backendUser.email.toLowerCase(),
+      cohort_id: backendUser.cohort_id ?? null,
+      role: backendUser.role,
     }
 
     setUser(authenticatedUser)
-    saveSession(authenticatedUser)
+    saveSession({ token, user: authenticatedUser })
     setSessionDate(formattedDate)
     setTasks(loadTasks(authenticatedUser.email))
     setAnnouncements(loadAnnouncements(authenticatedUser.email))

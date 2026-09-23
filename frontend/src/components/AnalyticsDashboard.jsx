@@ -36,8 +36,6 @@ export default function AnalyticsDashboard() {
   if (loading) {
     return <div className="planner-view focused"><p>Loading live analytics...</p></div>;
   }
-  
-  // ... rest of your return component render logic
 
   return (
     <div className="planner-view focused">
@@ -81,13 +79,13 @@ export default function AnalyticsDashboard() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
             {stats.activeModules?.map((mod, index) => (
-              <div key={index}>
+              <div key={index} className="module-bar-container">
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', fontWeight: 500, marginBottom: '6px', color: '#334155' }}>
                   <span>{mod.name}</span>
                   <span>{mod.percentage}%</span>
                 </div>
-                <div style={{ background: '#f1f5f9', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ background: '#312e81', width: `${mod.percentage}%`, height: '100%', borderRadius: '4px' }}></div>
+                <div className="progress-bar-track" style={{ background: '#f1f5f9', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div className="progress-bar-fill" style={{ background: '#312e81', width: `${mod.percentage}%`, height: '100%', borderRadius: '4px' }}></div>
                 </div>
               </div>
             ))}
