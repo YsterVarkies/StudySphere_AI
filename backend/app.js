@@ -24,6 +24,12 @@ app.use('/api/announcements', announcementRoutes);
 const summaryRoutes = require('./src/routes/summary.routes');
 app.use('/api/summaries', summaryRoutes);
 
+const quizRoutes = require('./src/routes/quiz.routes');
+app.use('/api/quizzes', quizRoutes);
+
+//const aiChatRoutes = require('./src/routes/aiChat.routes');
+//app.use('/api/chat', aiChatRoutes);
+
 // Admin Frontend - Analytics
 app.get('/api/analytics', async (req, res) => {
   try {
