@@ -242,6 +242,9 @@ app.delete('/api/users/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+const authRoutes = require('./routes/auth.routes'); 
+app.use('/api/auth', authRoutes);
 // End Admin Frontend
 
 // Health check
