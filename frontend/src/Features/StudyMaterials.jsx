@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"; 
+import AIChat from "./AIChat";
 import "./StudyMaterials.css"; // Import the CSS file for styling
 
 const API_URL = "http://localhost:5000/api"; // Replace with your actual API URL
@@ -293,7 +294,7 @@ function StudyMaterials() {
     return matchesSearch && matchesModule;
    });
 
-   if (activeView === "chat") {
+    if (activeView === "chat") {
         return (
             <main className="study-materials-page">
                 <header className="study-materials-page__header">
@@ -312,9 +313,9 @@ function StudyMaterials() {
                         ← Back to Study Materials
                     </button>
                 </header>
-                
-                <div style={{ padding: "20px", background: "#f9f9f9", borderRadius: "8px", marginTop: "20px" }}>
-                    <p>AI Chat interface for <em>{getDocumentName(activeChatDoc)}</em> goes here!</p>
+
+                <div style={{ marginTop: "20px" }}>
+                    <AIChat initialDocument={activeChatDoc} />
                 </div>
             </main>
         );
