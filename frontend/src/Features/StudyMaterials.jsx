@@ -10,6 +10,67 @@ const ALLOWED_TYPES = [
     "text/plain", // .txt
 ];
 
+/* // --- COMMENT OUT THIS ENTIRE BLOCK WHEN DONE TESTING ---
+const MOCK_MODULES = [
+    { module_id: "mod-1", module_name: "CMPG 323 - Information Systems" },
+    { module_id: "mod-2", module_name: "JME 410 - Research Methodology" },
+    { module_id: "mod-3", module_name: "DEV 301 - Software Development" },
+    { module_id: "mod-4", module_name: "DBAS 211 - Database Systems" },
+    { module_id: "mod-5", module_name: "NETW 312 - Network Engineering" }
+];
+
+const MOCK_DOCUMENTS = [
+    {
+        document_id: "doc-1",
+        name: "Project_Requirements_Specification.pdf",
+        module_id: "mod-1",
+        moduleName: "CMPG 323 - Information Systems",
+        file_size: 2048500, // ~2 MB
+        file_type: "application/pdf"
+    },
+    {
+        document_id: "doc-2",
+        name: "Research_Proposal_Template.docx",
+        module_id: "mod-2",
+        moduleName: "JME 410 - Research Methodology",
+        file_size: 512000, // ~512 KB
+        file_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    {
+        document_id: "doc-3",
+        name: "API_Endpoints_Notes.txt",
+        module_id: "mod-3",
+        moduleName: "DEV 301 - Software Development",
+        file_size: 15400, // ~15 KB
+        file_type: "text/plain"
+    },
+    {
+        document_id: "doc-4",
+        name: "SQL_Joins_Cheat_Sheet.pdf",
+        module_id: "mod-4",
+        moduleName: "DBAS 211 - Database Systems",
+        file_size: 1250000, // ~1.2 MB
+        file_type: "application/pdf"
+    },
+    {
+        document_id: "doc-5",
+        name: "Subnetting_Practice_Problems.docx",
+        module_id: "mod-5",
+        moduleName: "NETW 312 - Network Engineering",
+        file_size: 840000, // ~840 KB
+        file_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    {
+        document_id: "doc-6",
+        name: "Weekly_Lecture_Slides_Week4.pdf",
+        module_id: "mod-1",
+        moduleName: "CMPG 323 - Information Systems",
+        file_size: 5400000, // ~5.4 MB
+        file_type: "application/pdf"
+    }
+];
+ //-------------------------------------------------------/ */
+
 function getSession() {
     try {
         const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user") || localStorage.getItem("token");
@@ -65,6 +126,9 @@ function StudyMaterials() {
     }, []);
 
     async function loadDocuments() {
+
+        if (typeof MOCK_DOCUMENTS !== 'undefined') { setDocuments(MOCK_DOCUMENTS); setLoading(false); return; }
+
         setLoading(true); 
         setError(""); 
         try {
@@ -96,6 +160,9 @@ function StudyMaterials() {
     }
 
     async function loadModules() {
+
+        if (typeof MOCK_MODULES !== 'undefined') { setModules(MOCK_MODULES); return; }
+
         try {
             const token = getToken(); // token retrieval
             const response = await fetch(`${API_URL}/modules`, {
