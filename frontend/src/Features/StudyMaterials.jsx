@@ -12,7 +12,15 @@ const ALLOWED_TYPES = [
 
 function getSession() {
     try {
-        return JSON.parse(localStorage.getItem("studysphere_session") || null); 
+        const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user") || localStorage.getItem("token");
+        
+        if (!sessionStr) return null;
+
+        const parsed = JSON.parse(sessionStr);
+        if (typeof parsed === 'string') {
+            return {token: parsed};
+        }
+        return parsed;
     } catch (error) {
         console.error("Error parsing session from localStorage:", error); 
         return null; 
@@ -21,7 +29,12 @@ function getSession() {
 
 function getUserId() {
     const user = getSession();
-    return user?.user_id || user?.studentNumber || user?.email || ""; 
+    return user?.user_id || user?.id || user?.studentNumber || user?.email || ""; 
+}
+
+function getToken() {
+    const session = getSession();
+    return session?.token || session?.accessToken || localStorage.getItem("token") || "";
 }
 
 function StudyMaterials() {
@@ -47,7 +60,16 @@ function StudyMaterials() {
         setError(""); 
         try {
             const userId = getUserId(); 
-            const response = await fetch(`${API_URL}/documents${userId ? `?userId=${encodeURIComponent(userId)}` : ""}`); 
+            const token = getToken();
+
+            const response = await fetch (
+                `${API_URL}/documents${userId ? `?userId=${encodeURIComponent(userId)}` : ""}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
 
             if (!response.ok) {
                 throw new Error("Could not load documents"); 
@@ -66,7 +88,12 @@ function StudyMaterials() {
 
     async function loadModules() {
         try {
-            const response = await fetch(`${API_URL}/modules`); 
+            const token = getToken();
+            const response = await fetch(`${API_URL}/modules`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            }); 
             if (!response.ok) {
                 throw new Error("Could not load modules"); 
             }
@@ -119,19 +146,26 @@ function StudyMaterials() {
         try {
             const userId = getUserId(); 
             const formData = new FormData(); 
-            formData.append("file", selectedFile); 
-            formData.append("filename", selectedFile.name); 
+            formData.append("file", selectedFile);  
             formData.append("title", selectedFile.name); 
-            formData.append("moduleId", activeModuleId); 
+            formData.append("module_id", activeModuleId);
+            formData.append("file_path", selectedFile.name);
+            formData.append("file_type", selectedFile.type);
+            formData.append("file_size", selectedFile.size); 
 
             if (userId) {
                 formData.append("userId", userId); 
             }
 
-            const response = await fetch(`${API_URL}/documents`, {
-                method: "POST", 
-                body: formData, 
-            });
+           const token = getToken();
+
+           const response = await fetch(`${API_URL}/documents`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+                body: formData,
+           });
 
             const data = await response.json().catch(() => ({})); 
 
@@ -167,13 +201,17 @@ function StudyMaterials() {
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; 
     }
 
-    const filteredDocuments = documents.filter((document) => {
-        const name = getDocumentName(document).toLowerCase(); 
-        const module = String(getDocumentModule(document)); 
-        const matchesSearch = name.includes(searchTerm.toLowerCase()); 
-        const matchesModule = !selectedModule || module === String(selectedModule); 
-        return matchesSearch && matchesModule; 
-    });
+   const filteredDocuments = documents.filter((document) => {
+    const name = getDocumentName(document).toLowerCase();
+    const documentModuleId = String(
+        document.module_id ||
+        document.moduleId ||
+        ""
+    );
+    const matchesSearch = name.includes(searchTerm.toLowerCase());
+    const matchesModule = !selectedModule || documentModuleId === String(selectedModule);
+    return matchesSearch && matchesModule;
+   });
 
     return (
         <main className="study-materials-page">
@@ -185,7 +223,7 @@ function StudyMaterials() {
                 <button
                     type="button"
                     className="study-materials-page__upload-top-btn"
-                    onClick={() => fileInputRef.current.click()} 
+                    onClick={() => fileInputRef.current?.click()} 
                 >
                     +  Upload document
                 </button>
@@ -303,7 +341,7 @@ function StudyMaterials() {
                         {/* Inline Upload DropZone Card */}
                         <div
                             className="study-materials-page__dropzone-card"
-                            onClick={() => fileInputRef.current.click()}
+                            onClick={() => fileInputRef.current?.click()}
                         >
                             <div className="study-materials-page__dropzone-icon">☁️</div>
                             <p>Drop a PDF, DOCX or TXT file<br />up to 25MB</p>
