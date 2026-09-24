@@ -10,7 +10,7 @@ const ALLOWED_TYPES = [
     "text/plain", // .txt
 ];
 
-/* // --- COMMENT OUT THIS ENTIRE BLOCK WHEN DONE TESTING ---
+// --- COMMENT OUT THIS ENTIRE BLOCK WHEN DONE TESTING ---
 const MOCK_MODULES = [
     { module_id: "mod-1", module_name: "CMPG 323 - Information Systems" },
     { module_id: "mod-2", module_name: "JME 410 - Research Methodology" },
@@ -69,7 +69,7 @@ const MOCK_DOCUMENTS = [
         file_type: "application/pdf"
     }
 ];
- //-------------------------------------------------------/ */
+ //-------------------------------------------------------/
 
 function getSession() {
     try {
@@ -119,6 +119,9 @@ function StudyMaterials() {
     const [uploading, setUploading] = useState(false); 
     const [error, setError] = useState(""); 
     const [message, setMessage] = useState(""); 
+
+    const [activeView, setActiveView] = useState("list"); // "list" or "chat"
+    const [activeChatDoc, setActiveChatDoc] = useState(null);
 
     useEffect(() => {
         loadDocuments(); 
@@ -290,6 +293,33 @@ function StudyMaterials() {
     return matchesSearch && matchesModule;
    });
 
+   if (activeView === "chat") {
+        return (
+            <main className="study-materials-page">
+                <header className="study-materials-page__header">
+                    <div>
+                        <h1>AI Chat</h1>
+                        <p>Chatting about: <strong>{getDocumentName(activeChatDoc)}</strong></p>
+                    </div>
+                    <button
+                        type="button"
+                        className="study-materials-page__upload-top-btn"
+                        onClick={() => {
+                            setActiveView("list");
+                            setActiveChatDoc(null);
+                        }}
+                    >
+                        ← Back to Study Materials
+                    </button>
+                </header>
+                
+                <div style={{ padding: "20px", background: "#f9f9f9", borderRadius: "8px", marginTop: "20px" }}>
+                    <p>AI Chat interface for <em>{getDocumentName(activeChatDoc)}</em> goes here!</p>
+                </div>
+            </main>
+        );
+    }
+
     return (
         <main className="study-materials-page">
             <header className="study-materials-page__header">
@@ -409,7 +439,13 @@ function StudyMaterials() {
                                         </div>
                                     </div>
                                 </div>
-                                <button className="study-materials-page__chat-btn" type="button">
+                                <button className="study-materials-page__chat-btn" 
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveChatDoc(document);
+                                            setActiveView("chat");
+                                        }}
+                                        >
                                     💬 Chat with this
                                 </button>
                             </article>
