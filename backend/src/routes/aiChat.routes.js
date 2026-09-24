@@ -1,4 +1,4 @@
-/*const express = require('express');
+const express = require('express');
 const router = express.Router();
 const aiChatController = require('../controllers/aiChat.controller');
 
@@ -10,4 +10,4 @@ router.delete('/sessions/:id', aiChatController.deleteSession);
 router.post('/message', aiChatController.sendMessage);
 router.get('/messages', aiChatController.getAllMessages);
 
-module.exports = router;*/
+module.exports = router;
