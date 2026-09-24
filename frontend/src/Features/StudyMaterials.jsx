@@ -263,7 +263,7 @@ function StudyMaterials() {
                         const id = module.module_id || module.id || module.moduleId;
                         const name = module.module_name || module.name || module.moduleName || module.title || id || "Unnamed Module";
                         return (
-                            <option key={id} value={name}>{name}</option>
+                            <option key={id} value={id}>{name}</option>
                         );
                     })}
                 </select>
