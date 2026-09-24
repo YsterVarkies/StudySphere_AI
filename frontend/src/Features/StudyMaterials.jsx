@@ -11,7 +11,7 @@ const ALLOWED_TYPES = [
     "text/plain", // .txt
 ];
 
-// --- COMMENT OUT THIS ENTIRE BLOCK WHEN DONE TESTING ---
+/* // --- COMMENT OUT THIS ENTIRE BLOCK WHEN DONE TESTING ---
 const MOCK_MODULES = [
     { module_id: "mod-1", module_name: "CMPG 323 - Information Systems" },
     { module_id: "mod-2", module_name: "JME 410 - Research Methodology" },
@@ -70,7 +70,7 @@ const MOCK_DOCUMENTS = [
         file_type: "application/pdf"
     }
 ];
- //-------------------------------------------------------/
+ //-------------------------------------------------------/ */
 
 function getSession() {
     try {
