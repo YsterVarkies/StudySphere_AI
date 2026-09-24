@@ -16,12 +16,21 @@ function getSession() {
         
         if (!sessionStr) return null;
 
+        // If it looks like a raw token string rather than a JSON object, return it wrapped
+        if (!sessionStr.startsWith("{") && !sessionStr.startsWith("[")) {
+            return { token: sessionStr };
+        }
+
         const parsed = JSON.parse(sessionStr);
         if (typeof parsed === 'string') {
             return {token: parsed};
         }
         return parsed;
     } catch (error) {
+        // Fallback if it's just a raw token string stored under 'token'
+        const rawToken = localStorage.getItem("token");
+        if (rawToken) return { token: rawToken };
+
         console.error("Error parsing session from localStorage:", error); 
         return null; 
     }
