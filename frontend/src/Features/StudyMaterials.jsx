@@ -16,18 +16,12 @@ function getSession() {
         
         if (!sessionStr) return null;
 
-        if (!sessionStr.startsWith("{") && !sessionStr.startsWith("[")) {
-            return { token: sessionStr };
-        }
-
         const parsed = JSON.parse(sessionStr);
         if (typeof parsed === 'string') {
             return {token: parsed};
         }
         return parsed;
     } catch (error) {
-        const rawToken = localStorage.getItem("token");
-        if (rawToken) return { token: rawToken };
         console.error("Error parsing session from localStorage:", error); 
         return null; 
     }
@@ -72,7 +66,7 @@ function StudyMaterials() {
                 `${API_URL}/documents${userId ? `?userId=${encodeURIComponent(userId)}` : ""}`,
                 {
                     headers: {
-                        Authorization: token ? `Bearer ${token}`: "",
+                        Authorization: `Bearer ${token}`,
                     },
                 }
             );
@@ -97,7 +91,7 @@ function StudyMaterials() {
             const token = getToken(); // token retrieval
             const response = await fetch(`${API_URL}/modules`, {
                 headers: {
-                    Authorization: token ? `Bearer ${token}` : "", //authorization header
+                    Authorization:`Bearer ${token}`, //authorization header
                 },
             }); 
             if (!response.ok) {
@@ -169,7 +163,7 @@ function StudyMaterials() {
            const response = await fetch(`${API_URL}/documents`, {
                 method: "POST",
                 headers: {
-                    Authorization: token ? `Bearer ${token}` : "",
+                    Authorization: `Bearer ${token}`,
                 },
                 body: formData,
            });
@@ -197,7 +191,7 @@ function StudyMaterials() {
     }
 
     function getDocumentModule(document) {
-        return (document.moduleName || document.module_name || document.module?.name || document.module || "Unknown Module"); 
+        return (document.moduleName || document.module_name  || document.module || "Unknown Module"); 
     }
 
     function formatFileSize(size) {
@@ -213,7 +207,6 @@ function StudyMaterials() {
     const documentModuleId = String(
         document.module_id ||
         document.moduleId ||
-        document.module?.id ||
         ""
     );
     const matchesSearch = name.includes(searchTerm.toLowerCase());
