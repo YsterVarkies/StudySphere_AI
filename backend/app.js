@@ -150,10 +150,24 @@ app.delete('/api/cohorts/:id', async (req, res) => {
 // Update a module by code
 app.put('/api/modules/:code', async (req, res) => {
   try {
-    const { code } = req.params;
-    const { name, description } = req.body;
-    const query = 'UPDATE MODULE SET module_name = ?, description = ? WHERE module_code = ?';
-    await db.query(query, [name.trim(), description, code]);
+    const oldCode = req.params.code;
+    const { code, name, module_name, description } = req.body;
+    
+    const finalCode = (code || oldCode).trim().toUpperCase();
+    const finalName = name || module_name;
+
+    console.log(`[DEBUG] Updating module code from ${oldCode} to ${finalCode}`);
+    console.log(`[DEBUG] New Name: ${finalName}, Description: ${description}`);
+
+    const query = 'UPDATE MODULE SET module_code = ?, module_name = ?, description = ? WHERE module_code = ?';
+    const [result] = await db.query(query, [finalCode, finalName ? finalName.trim() : null, description || 'Standard module description', oldCode]);
+
+    console.log(`[DEBUG] MySQL update result:`, result);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Module not found or no changes made' });
+    }
+
     res.json({ success: true, message: 'Module updated successfully' });
   } catch (err) {
     console.error('Database error updating module:', err);
@@ -195,24 +209,6 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// Create a new user
-app.post('/api/users', async (req, res) => {
-  try {
-    const { name, email, role, passwordHash } = req.body;
-    const nameParts = name.split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(' ');
-    const dbRole = role === 'Administrator' ? 'admin' : 'student';
-
-    const query = 'INSERT INTO USER (first_name, last_name, email, role, is_active, password_hash) VALUES (?, ?, ?, ?, 1, ?)';
-    await db.query(query, [firstName, lastName, email.trim(), dbRole, passwordHash]);
-
-    res.status(201).json({ success: true, message: 'User created successfully' });
-  } catch (err) {
-    console.error('Database error creating user:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // Update an existing user
 app.put('/api/users/:id', async (req, res) => {

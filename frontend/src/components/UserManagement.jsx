@@ -8,33 +8,45 @@ export default function UserManagement() {
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState('Student');
+  
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('All roles');
+
+  // Helper to extract JWT token from studysphere_session storage
+  function getAuthHeader() {
+    try {
+      const sessionStr = localStorage.getItem('studysphere_session');
+      if (!sessionStr) return {};
+      const session = JSON.parse(sessionStr);
+      return session.token ? { 'Authorization': `Bearer ${session.token}` } : {};
+    } catch (e) {
+      console.error("Error reading session token:", e);
+      return {};
+    }
+  }
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
   function fetchUsers() {
-    fetch('http://localhost:5000/api/users')
+    fetch('http://localhost:5000/api/users', {
+      headers: { ...getAuthHeader() }
+    })
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch users');
         return res.json();
       })
       .then((data) => {
-        setUsers(Array.isArray(data) ? data : []);
+        const userList = Array.isArray(data) ? data : (data.users || data.data || data.items || []);
+        setUsers(userList);
         setLoading(false);
       })
       .catch((err) => {
         console.error('Error fetching users from backend:', err);
         setLoading(false);
       });
-  }
-
-  function handleOpenAdd() {
-    setEditingUser(null);
-    setNewName('');
-    setNewEmail('');
-    setNewRole('Student');
-    setIsModalOpen(true);
   }
 
   function handleOpenEdit(user) {
@@ -47,17 +59,16 @@ export default function UserManagement() {
 
   function handleSaveUser(e) {
     e.preventDefault();
-    if (!newName.trim() || !newEmail.trim()) return;
+    if (!newName.trim() || !newEmail.trim() || !editingUser) return;
 
-    const url = editingUser 
-      ? `http://localhost:5000/api/users/${editingUser.id}` 
-      : 'http://localhost:5000/api/users';
-    
-    const method = editingUser ? 'PUT' : 'POST';
+    const url = `http://localhost:5000/api/users/${editingUser.id}`;
 
     fetch(url, {
-      method: method,
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      },
       body: JSON.stringify({ 
         name: newName.trim(), 
         email: newEmail.trim(), 
@@ -66,7 +77,7 @@ export default function UserManagement() {
       })
     })
       .then((res) => {
-        if (!res.ok) throw new Error('Failed to save user');
+        if (!res.ok) throw new Error('Failed to update user');
         return res.json();
       })
       .then(() => {
@@ -77,14 +88,15 @@ export default function UserManagement() {
         setNewEmail('');
         setNewRole('Student');
       })
-      .catch((err) => console.error('Error saving user:', err));
+      .catch((err) => console.error('Error updating user:', err));
   }
 
   function handleDeleteUser(id) {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
 
     fetch(`http://localhost:5000/api/users/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { ...getAuthHeader() }
     })
       .then((res) => {
         if (!res.ok) throw new Error('Failed to delete user');
@@ -92,6 +104,18 @@ export default function UserManagement() {
       })
       .catch((err) => console.error('Error deleting user:', err));
   }
+
+  // Filter users based on search query and role filter selection
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch = 
+      (user.name && user.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesRole = 
+      roleFilter === 'All roles' || user.role === roleFilter;
+
+    return matchesSearch && matchesRole;
+  });
 
   if (loading) {
     return <div className="planner-view focused"><p>Loading user management from database...</p></div>;
@@ -104,10 +128,33 @@ export default function UserManagement() {
           <h1>User management</h1>
           <p>Manage system users and database records securely.</p>
         </div>
-        <button className="planner-button" type="button" onClick={handleOpenAdd}>
-          <span className="plus">+</span> Add user
-        </button>
       </header>
+
+      {/* Toolbar with Search Bar and Role Filter Dropdown */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: '1', minWidth: '240px', maxWidth: '320px' }}>
+          <input
+            type="text"
+            placeholder="Search by name or email"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '100%', padding: '10px 14px 10px 36px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.875rem', outline: 'none', background: '#fff' }}
+          />
+          <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
+        </div>
+
+        <div>
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.875rem', outline: 'none', background: '#fff', cursor: 'pointer', minWidth: '140px' }}
+          >
+            <option value="All roles">All roles</option>
+            <option value="Student">Student</option>
+            <option value="Administrator">Administrator</option>
+          </select>
+        </div>
+      </div>
 
       {/* Users Table Panel */}
       <section className="task-panel panel" style={{ padding: '24px', borderRadius: '16px', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
@@ -122,48 +169,56 @@ export default function UserManagement() {
             </tr>
           </thead>
           <tbody>
-            {users.map((user, index) => (
-              <tr key={user.id || index} style={{ borderBottom: index < users.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                <td style={{ padding: '16px 0', fontWeight: 500, color: '#334155' }}>{user.name}</td>
-                <td style={{ padding: '16px 0', color: '#475569' }}>{user.email}</td>
-                <td style={{ padding: '16px 0', color: '#334155' }}>
-                  <span style={{ padding: '2px 8px', background: user.role === 'Administrator' ? '#e0f2fe' : '#f1f5f9', color: user.role === 'Administrator' ? '#0369a1' : '#475569', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
-                    {user.role}
-                  </span>
-                </td>
-                <td style={{ padding: '16px 0', color: user.status === 'Active' ? '#059669' : '#94a3b8', fontWeight: 500 }}>
-                  {user.status || 'Active'}
-                </td>
-                <td style={{ padding: '16px 0', textAlign: 'right' }}>
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                    <button 
-                      type="button" 
-                      onClick={() => handleOpenEdit(user)} 
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0284c7', fontSize: '0.875rem', fontWeight: 500 }}
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => handleDeleteUser(user.id)} 
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.875rem', fontWeight: 500 }}
-                    >
-                      Delete
-                    </button>
-                  </div>
+            {filteredUsers.length > 0 ? (
+              filteredUsers.map((user, index) => (
+                <tr key={user.id || index} style={{ borderBottom: index < filteredUsers.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                  <td style={{ padding: '16px 0', fontWeight: 500, color: '#334155' }}>{user.name}</td>
+                  <td style={{ padding: '16px 0', color: '#475569' }}>{user.email}</td>
+                  <td style={{ padding: '16px 0', color: '#334155' }}>
+                    <span style={{ padding: '2px 8px', background: user.role === 'Administrator' ? '#e0f2fe' : '#f1f5f9', color: user.role === 'Administrator' ? '#0369a1' : '#475569', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                      {user.role}
+                    </span>
+                  </td>
+                  <td style={{ padding: '16px 0', color: user.status === 'Active' ? '#059669' : '#94a3b8', fontWeight: 500 }}>
+                    {user.status || 'Active'}
+                  </td>
+                  <td style={{ padding: '16px 0', textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => handleOpenEdit(user)} 
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0284c7', fontSize: '0.875rem', fontWeight: 500 }}
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => handleDeleteUser(user.id)} 
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.875rem', fontWeight: 500 }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
+                  No users found matching your criteria.
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </section>
 
-      {/* Add / Edit User Modal */}
+      {/* Edit User Modal */}
       {isModalOpen && (
         <div className="task-modal-backdrop" role="presentation" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <form className="task-modal panel" onSubmit={handleSaveUser} style={{ background: '#fff', padding: '24px', borderRadius: '12px', width: '400px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
             <div className="task-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2>{editingUser ? 'Edit user' : 'Add new user'}</h2>
+              <h2>Edit user</h2>
               <button className="modal-close" type="button" onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer' }}>×</button>
             </div>
 
@@ -188,7 +243,7 @@ export default function UserManagement() {
             <div className="task-modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button className="modal-secondary-button" type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '8px 16px', background: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
               <button className="planner-button" type="submit" style={{ padding: '8px 16px', background: '#312e81', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-                {editingUser ? 'Save changes' : 'Save user'}
+                Save changes
               </button>
             </div>
           </form>

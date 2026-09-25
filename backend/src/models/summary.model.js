@@ -13,7 +13,7 @@ const Summary = {
   async getById(summaryId, userId) {
     const [rows] = await db.execute(
       `SELECT s.*, d.title AS document_title
-       FROM summary s
+       FROM SUMMARY s
        LEFT JOIN document d ON s.source_document_id = d.document_id
        WHERE s.summary_id = ? AND s.created_by_user_id = ?`,
       [summaryId, userId]
@@ -24,7 +24,7 @@ const Summary = {
   async getByUser(userId, documentId = null) {
     let query = `
       SELECT s.*, d.title AS document_title
-      FROM summary s
+      FROM SUMMARY s
       LEFT JOIN document d ON s.source_document_id = d.document_id
       WHERE s.created_by_user_id = ?
     `;
@@ -43,7 +43,7 @@ const Summary = {
 
   async delete(summaryId, userId) {
     const [result] = await db.execute(
-      `DELETE FROM summary WHERE summary_id = ? AND created_by_user_id = ?`,
+      `DELETE FROM SUMMARY WHERE summary_id = ? AND created_by_user_id = ?`,
       [summaryId, userId]
     );
     return result.affectedRows > 0;

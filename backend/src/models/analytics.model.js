@@ -28,48 +28,48 @@ const Analytics = {
     const [users] = await db.execute(
       `SELECT COUNT(*) AS total_users,
               SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_users
-       FROM user`
+       FROM USER`
     );
 
     const [modules] = await db.execute(
-      `SELECT COUNT(*) AS total_modules FROM module`
+      `SELECT COUNT(*) AS total_modules FROM MODULE`
     );
 
     const [documents] = await db.execute(
-      `SELECT COUNT(*) AS total_documents FROM document`
+      `SELECT COUNT(*) AS total_documents FROM DOCUMENT`
     );
 
     const [quizzes] = await db.execute(
-      `SELECT COUNT(*) AS total_quizzes FROM quiz`
+      `SELECT COUNT(*) AS total_quizzes FROM QUIZ`
     );
 
     const [flashcards] = await db.execute(
-      `SELECT COUNT(*) AS total_flashcard_sets FROM flashcard_set`
+      `SELECT COUNT(*) AS total_flashcard_sets FROM FLASHCARD_SET`
     );
 
     const [summaries] = await db.execute(
-      `SELECT COUNT(*) AS total_summaries FROM summary`
+      `SELECT COUNT(*) AS total_summaries FROM SUMMARY`
     );
 
     const [chatSessions] = await db.execute(
-      `SELECT COUNT(*) AS total_chat_sessions FROM chat_session`
+      `SELECT COUNT(*) AS total_chat_sessions FROM CHAT_SESSION`
     );
 
     const [announcements] = await db.execute(
-      `SELECT COUNT(*) AS total_announcements FROM announcement`
+      `SELECT COUNT(*) AS total_announcements FROM ANNOUNCEMENT`
     );
 
     // Activity last 24 hours
     const [recentActivity] = await db.execute(
       `SELECT COUNT(*) AS activity_last_24h
-       FROM user_activity_log
+       FROM USER_ACTIVITY_LOG
        WHERE created_at >= NOW() - INTERVAL 1 DAY`
     );
 
     // Errors last 24 hours
     const [errors] = await db.execute(
       `SELECT COUNT(*) AS errors_last_24h
-       FROM user_activity_log
+       FROM USER_ACTIVITY_LOG
        WHERE log_level = 'error'
          AND created_at >= NOW() - INTERVAL 1 DAY`
     );
@@ -99,12 +99,12 @@ const Analytics = {
         m.module_id,
         m.module_code,
         m.module_name,
-        (SELECT COUNT(*) FROM document d WHERE d.module_id = m.module_id) AS documents,
-        (SELECT COUNT(*) FROM quiz q WHERE q.module_id = m.module_id) AS quizzes,
-        (SELECT COUNT(*) FROM flashcard_set fs WHERE fs.module_id = m.module_id) AS flashcard_sets,
-        (SELECT COUNT(*) FROM chat_session cs WHERE cs.module_id = m.module_id) AS chat_sessions,
-        (SELECT COUNT(*) FROM announcement a WHERE a.module_id = m.module_id) AS announcements
-      FROM module m
+        (SELECT COUNT(*) FROM DOCUMENT d WHERE d.module_id = m.module_id) AS documents,
+        (SELECT COUNT(*) FROM QUIZ q WHERE q.module_id = m.module_id) AS quizzes,
+        (SELECT COUNT(*) FROM FLASHCARD_SET fs WHERE fs.module_id = m.module_id) AS flashcard_sets,
+        (SELECT COUNT(*) FROM CHAT_SESSION cs WHERE cs.module_id = m.module_id) AS chat_sessions,
+        (SELECT COUNT(*) FROM ANNOUNCEMENT a WHERE a.module_id = m.module_id) AS announcements
+      FROM MODULE m
       ORDER BY documents DESC, quizzes DESC
       `
     );
@@ -129,8 +129,8 @@ const Analytics = {
         u.first_name,
         u.last_name,
         u.email
-      FROM user_activity_log l
-      LEFT JOIN user u ON l.user_id = u.user_id
+      FROM USER_ACTIVITY_LOG l
+      LEFT JOIN USER u ON l.user_id = u.user_id
       ORDER BY l.created_at DESC
       LIMIT ?
       `,
@@ -149,7 +149,7 @@ const Analytics = {
         DATE(created_at) AS day,
         COUNT(*) AS total,
         SUM(CASE WHEN log_level = 'error' THEN 1 ELSE 0 END) AS errors
-      FROM user_activity_log
+      FROM USER_ACTIVITY_LOG
       WHERE created_at >= NOW() - INTERVAL ? DAY
       GROUP BY DATE(created_at)
       ORDER BY day ASC
@@ -172,8 +172,8 @@ const Analytics = {
         u.email,
         u.role,
         COUNT(l.activity_id) AS activity_count
-      FROM user u
-      LEFT JOIN user_activity_log l ON u.user_id = l.user_id
+      FROM USER u
+      LEFT JOIN USER_ACTIVITY_LOG l ON u.user_id = l.user_id
       GROUP BY u.user_id, u.first_name, u.last_name, u.email, u.role
       ORDER BY activity_count DESC
       LIMIT ?
