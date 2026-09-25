@@ -74,6 +74,10 @@ const MOCK_DOCUMENTS = [
 
 function getSession() {
     try {
+        // check all common storage variations used across differnt team components
+        const rawToken = localStorage.getItem("token") || localStorage.getItem("accessToken");
+        if (rawToken) return { token: rawToken };
+
         const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user") || localStorage.getItem("token");
         
         if (!sessionStr) return null;
@@ -143,13 +147,13 @@ function StudyMaterials() {
                 `${API_URL}/documents${userId ? `?userId=${encodeURIComponent(userId)}` : ""}`,
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: token ? `Bearer ${token}` : "",
                     },
                 }
             );
 
             if (!response.ok) {
-                throw new Error("Could not load documents"); 
+                throw new Error(`Could not load documents (Status: ${response.status})`); 
             }
 
             const data = await response.json(); 
@@ -157,6 +161,7 @@ function StudyMaterials() {
             setDocuments(list); 
 
         } catch (error) {
+            console.error("Load documents error: ", error);
             setError(error.message || "An error occurred while loading documents"); 
         } finally {
             setLoading(false); 
@@ -171,15 +176,18 @@ function StudyMaterials() {
             const token = getToken(); // token retrieval
             const response = await fetch(`${API_URL}/modules`, {
                 headers: {
-                    Authorization:`Bearer ${token}`, //authorization header
+                    Authorization: token ? `Bearer ${token}` : "", //authorization header
                 },
             }); 
             if (!response.ok) {
-                throw new Error("Could not load modules"); 
+                throw new Error(`Could not load modules (Status: ${response.status})`); 
             }
             const data = await response.json(); 
-            setModules(data.modules || data.data || (Array.isArray(data) ? data : [])); 
+            const list = data.modules || data.data || (Array.isArray(data) ? data : []);
+            setModules(list); 
+
         } catch (error) {
+            console.error("Load modules error: ", error);
             setError(error.message || "An error occurred while loading modules"); 
         }
     }
@@ -224,26 +232,18 @@ function StudyMaterials() {
         setMessage(""); 
 
         try {
-            const userId = getUserId(); 
+             
             const formData = new FormData(); 
             formData.append("file", selectedFile);  
             formData.append("title", selectedFile.name); 
             formData.append("moduleId", activeModuleId);
-            formData.append("module_id", activeModuleId);
-            formData.append("file_path", selectedFile.name);
-            formData.append("file_type", selectedFile.type);
-            formData.append("file_size", selectedFile.size); 
-
-            if (userId) {
-                formData.append("userId", userId); 
-            }
 
            const token = getToken();
 
            const response = await fetch(`${API_URL}/documents`, {
                 method: "POST",
                 headers: {
-                    Authorization: `Bearer ${token}`,
+                    Authorization: token ? `Bearer ${token}` : "",
                 },
                 body: formData,
            });
@@ -251,7 +251,7 @@ function StudyMaterials() {
             const data = await response.json().catch(() => ({})); 
 
             if (!response.ok) {
-                throw new Error(data.message || "Document upload failed"); 
+                throw new Error(data.message || `Document upload failed (Status: ${response.status})`); 
             }
 
             setMessage("Document uploaded successfully!"); 
@@ -260,6 +260,7 @@ function StudyMaterials() {
            
             await loadDocuments(); 
         } catch (error) {
+            console.error("Upload error: ", error);
             setError(error.message || "An error occurred during upload"); 
         } finally {
             setUploading(false); 
