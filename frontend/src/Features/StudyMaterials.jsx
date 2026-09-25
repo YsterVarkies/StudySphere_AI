@@ -366,7 +366,7 @@ function StudyMaterials() {
                                 >
                                     <option value="">Select a Module</option>
                                     {modules.map((module) => {
-                                        const id = module.module_id || module.id || module.moduleId;
+                                        const id = module.module_id || module.id || module.moduleId || module.code;
                                         const name = module.module_name || module.name || module.moduleName || module.title || id || "Unnamed Module";
                                         return (
                                             <option key={id} value={id}>{name}</option>
@@ -407,7 +407,7 @@ function StudyMaterials() {
                 <select value={selectedModule} onChange={(event) => setSelectedModule(event.target.value)}>
                     <option value="">All Modules</option>
                     {modules.map((module) => {
-                        const id = module.module_id || module.id || module.moduleId;
+                        const id = module.module_id || module.id || module.moduleId || module.code;
                         const name = module.module_name || module.name || module.moduleName || module.title || id || "Unnamed Module";
                         return (
                             <option key={id} value={id}>{name}</option>
