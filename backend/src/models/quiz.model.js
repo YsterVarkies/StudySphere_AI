@@ -79,7 +79,7 @@ const Quiz = {
       SELECT q.quiz_id, q.title, q.module_id, q.document_id, q.created_at,
              m.module_name, d.title AS document_title,
              (SELECT COUNT(*) FROM quiz_question qq WHERE qq.quiz_id = q.quiz_id) AS question_count
-      FROM quiz q
+      FROM QUIZ q
       LEFT JOIN module m ON q.module_id = m.module_id
       LEFT JOIN document d ON q.document_id = d.document_id
       WHERE q.user_id = ?
@@ -99,7 +99,7 @@ const Quiz = {
 
   async delete(quizId, userId) {
     const [result] = await db.execute(
-      `DELETE FROM quiz WHERE quiz_id = ? AND user_id = ?`,
+      `DELETE FROM QUIZ WHERE quiz_id = ? AND user_id = ?`,
       [quizId, userId]
     );
     return result.affectedRows > 0;

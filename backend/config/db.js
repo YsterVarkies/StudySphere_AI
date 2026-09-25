@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const mysql = require('mysql2/promise');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 const requiredEnv = [
   'DB_HOST',
@@ -44,6 +44,8 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  enableKeepAlive: true,  
+  keepAliveInitialDelay: 10000,
 });
 
 pool.on('error', (error) => {
