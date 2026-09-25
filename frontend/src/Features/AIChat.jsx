@@ -11,14 +11,15 @@ function getSession() {
     }
 }
 
-function getUserID() {
+function getUserId() {
     const user = getSession();
-    return user?.user_id || user?.studentNumber || user?.email || "";
+    return user?.user_id || user?.studentNumber || user?.email || 1;
 }
 
 function AIChat() {
     const [documents, setDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState([]);
+    const [sessionId, setSessionId] = useState(null);
     const [question, setQuestion] = useState("");
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -27,6 +28,11 @@ function AIChat() {
     useEffect(() => {
         loadDocuments();
     }, []);
+
+    //whenever selected documents change, ensure we have an active chat session
+    useEffect(() => {
+       getOrCreateSession();
+    }, [selectedDocuments, documents]);
 
     async function loadDocuments() {
         try{
@@ -49,6 +55,37 @@ function AIChat() {
         }
     }
 
+    async function getOrCreateSession() {
+        try {
+            const userId = getUserId();
+            const documentId = selectedDocuments.length > 0 ? selectedDocuments[0] : null;
+            const moduleId = 1; // defualt module if not explicitly tracked here
+
+            //check existing sessions
+            const res = await fetch(`${API_URL}/chat/sessions?userId=${userId}`);
+            const data = await res.json();
+            const sessions = data.data || [];
+
+            if (sessions.length > 0) {
+                //use the first available session
+                setSessionId(sessions[0].session_id || sessions[0].id);
+            } else {
+                //create a new session if none exist
+                const createRes = await fetch(`${API_URL}/chat/sessions`, {
+                    method: "POST",
+                    headers: {"Content-Type" : "application/json"},
+                    body: JSON.stringify({ userId, moduleId, documentId, title: "Study session" })
+                });
+                const createData = await createRes.json();
+                if(createData.success && createData.data) {
+                    setSessionId(createData.data.session_id || createData.data.id);
+                }
+            }
+        } catch (err) {
+            console.error("Session error: ", err);
+        }
+    }
+
     function getDocumentId(document) {
         return document.document_id || document.id;
     }
@@ -65,7 +102,7 @@ function AIChat() {
 
     function toggleDocument(id) {
         setSelectedDocuments((current) =>
-            current.include(id)
+            current.includes(id)
                 ? current.filter((item) => item !== id)
                 : [...current, id]
         );
@@ -92,15 +129,22 @@ function AIChat() {
         setLoading(true);
 
         try{
-            const reponse = await fetch(`${API_URL}/ai/chat`, {
+            //ensure we have a session before sending
+            let activeSessionId = sessionId;
+            if(!activeSessionId){
+                await getOrCreateSession();
+                activeSessionId = sessionId;
+            }
+
+            const response = await fetch(`${API_URL}/chat/message`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
                     user_id: getUserId(),
-                    question: currentQuestion,
-                    document_ids: selectedDocuments,
+                    sessionId: activeSessionId,
+                    message: currentQuestion,
                 }),
             });
 
@@ -112,6 +156,7 @@ function AIChat() {
                 );
             }
             const answer = 
+                data.data?.aiReply ||
                 data.answer ||
                 data.response ||
                 data.message ||
@@ -126,7 +171,7 @@ function AIChat() {
                     sources: data.sources || data.citations || [],
                 },
             ]);
-        }catch (errror) {
+        }catch (error) {
             setError(error.message);
         } finally {
             setLoading(false);
@@ -191,7 +236,7 @@ function AIChat() {
                             <p>{message.content}</p>
 
                             {
-                                message.source?.length > 0 && (
+                                message.sources?.length > 0 && (
                                     <div className="ai-chat-page__sources">
                                         <strong>Sources</strong>
 
@@ -235,7 +280,7 @@ function AIChat() {
                         disabled={loading}
                         />
 
-                        <button type="submit" disbaled={loading || !question.trim()}>
+                        <button type="submit" disabled={loading || !question.trim()}>
                             {loading ? "Sending... " : "Send"}
                         </button>
                     </form>

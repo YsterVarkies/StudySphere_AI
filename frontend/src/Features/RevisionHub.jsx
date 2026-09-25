@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"; 
 import "./RevisionHub.css";
 
-const API_URL = "http://loacalHost:5000/api";
+const API_URL = "http://localhost:5000/api";
 
 function getSession() {
     try {
@@ -11,7 +11,7 @@ function getSession() {
     }
 }
 
-function getUserID() {
+function getUserId() {
     const user = getSession();
     return user?.user_id || user?.studentNumber || user?.email || "";
 }
@@ -76,14 +76,15 @@ function RevisionHub() {
         setLoading(true);
         setError("");
         setContent(null);
+        setMode(type);
         setCurrentQuestion(0);
         setSelectedAnswer(null);
         setShowAnswer(false);
 
         const endpoint = 
         type === "quiz"
-        ? `${API_URL}/ai/quiz`
-        : `${API_URL}/ai/flashcards`;
+        ? `${API_URL}/quizzes/generate`
+        : `${API_URL}/flashcards/generate`;
 
         try{
             const response = await fetch(endpoint, {
@@ -124,21 +125,15 @@ function RevisionHub() {
 
     function getQuestions() {
         if (Array.isArray(content)) return content;
-
         if (content?.questions) return content.questions;
-
         if (content?.quiz) return content.quiz;
-
         return [];
     }
 
     function getCards() {
         if (Array.isArray(content)) return content;
-
         if (content?.flashcards) return content.flashcards;
-
         if (content?.cards) return content.cards;
-
         return[];
     }
 
