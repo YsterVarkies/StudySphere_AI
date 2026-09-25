@@ -27,8 +27,11 @@ app.use('/api/summaries', summaryRoutes);
 const quizRoutes = require('./src/routes/quiz.routes');
 app.use('/api/quizzes', quizRoutes);
 
-//const aiChatRoutes = require('./src/routes/aiChat.routes');
-//app.use('/api/chat', aiChatRoutes);
+const aiChatRoutes = require('./src/routes/aiChat.routes');
+app.use('/api/chat', aiChatRoutes);
+
+const analyticsRoutes = require('./src/routes/analytics.routes');
+app.use('/api/analytics', analyticsRoutes);
 
 // Admin Frontend - Analytics (Strict Live Data, Zero Fallbacks)
 app.get('/api/analytics', async (req, res) => {
