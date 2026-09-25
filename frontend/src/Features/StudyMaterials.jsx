@@ -135,7 +135,7 @@ function StudyMaterials() {
 
     async function loadDocuments() {
 
-        if (typeof MOCK_DOCUMENTS !== 'undefined') { setDocuments(MOCK_DOCUMENTS); setLoading(false); return; }
+       /*  if (typeof MOCK_DOCUMENTS !== 'undefined') { setDocuments(MOCK_DOCUMENTS); setLoading(false); return; } */
 
         setLoading(true); 
         setError(""); 
@@ -170,7 +170,7 @@ function StudyMaterials() {
 
     async function loadModules() {
 
-        if (typeof MOCK_MODULES !== 'undefined') { setModules(MOCK_MODULES); return; }
+        /* if (typeof MOCK_MODULES !== 'undefined') { setModules(MOCK_MODULES); return; } */
 
         try {
             const token = getToken(); // token retrieval
