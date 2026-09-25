@@ -19,7 +19,7 @@ exports.generateQuiz = async (req, res) => {
     }
 
     const [docs] = await db.execute(
-      `SELECT document_id, title FROM document
+      `SELECT document_id, title FROM DOCUMENT
        WHERE document_id = ? AND user_id = ? AND module_id = ?`,
       [documentId, userId, moduleId]
     );

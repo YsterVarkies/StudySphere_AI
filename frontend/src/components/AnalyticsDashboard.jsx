@@ -14,16 +14,33 @@ export default function AnalyticsDashboard() {
   const [stats, setStats] = useState(initialStats);
   const [loading, setLoading] = useState(true);
 
+  // Helper to extract JWT token from studysphere_session storage
+  function getAuthHeader() {
+    try {
+      const sessionStr = localStorage.getItem('studysphere_session');
+      if (!sessionStr) return {};
+      const session = JSON.parse(sessionStr);
+      return session.token ? { 'Authorization': `Bearer ${session.token}` } : {};
+    } catch (e) {
+      console.error("Error reading session token:", e);
+      return {};
+    }
+  }
+
   useEffect(() => {
-    fetch('http://localhost:5000/api/analytics')
+    fetch('http://localhost:5000/api/analytics', {
+      headers: { ...getAuthHeader() }
+    })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return res.json();
       })
       .then((data) => {
         console.log('Successfully fetched live analytics:', data);
-        if (data) {
-          setStats(data);
+        // Handle both direct object response or wrapped { analytics: { ... } } response
+        const analyticsPayload = data.analytics || data;
+        if (analyticsPayload) {
+          setStats((prev) => ({ ...prev, ...analyticsPayload }));
         }
         setLoading(false);
       })
@@ -49,10 +66,14 @@ export default function AnalyticsDashboard() {
       {/* Top Metric Cards Grid */}
       <section className="metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
         <div className="metric-card panel" style={{ background: '#fff', padding: '20px', borderRadius: '8px' }}>
-          <h3 style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '8px' }}>Active users (7d)</h3>
-          <div className="metric-value" style={{ fontSize: '1.875rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>{stats.activeUsers}</div>
-          <p style={{ color: '#059669', fontWeight: 500, fontSize: '0.8rem' }}>+6% vs last week</p>
+        <h3 style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '8px' }}>Active users (7d)</h3>
+        <div className="metric-value" style={{ fontSize: '1.875rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
+          {stats.activeUsers}
         </div>
+        <p style={{ color: '#16a34a', fontSize: '0.8rem', fontWeight: 500, marginTop: '4px' }}>
+          {stats.userGrowth || "+0%"} vs last week
+        </p>
+      </div>
         <div className="metric-card panel" style={{ background: '#fff', padding: '20px', borderRadius: '8px' }}>
           <h3 style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '8px' }}>Modules live</h3>
           <div className="metric-value" style={{ fontSize: '1.875rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>{stats.modulesLive}</div>
@@ -78,17 +99,21 @@ export default function AnalyticsDashboard() {
             <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a' }}>Most active modules</h2>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
-            {stats.activeModules?.map((mod, index) => (
-              <div key={index} className="module-bar-container">
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', fontWeight: 500, marginBottom: '6px', color: '#334155' }}>
-                  <span>{mod.name}</span>
-                  <span>{mod.percentage}%</span>
+            {stats.activeModules && stats.activeModules.length > 0 ? (
+              stats.activeModules.map((mod, index) => (
+                <div key={index} className="module-bar-container">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', fontWeight: 500, marginBottom: '6px', color: '#334155' }}>
+                    <span>{mod.name}</span>
+                    <span>{mod.percentage}%</span>
+                  </div>
+                  <div className="progress-bar-track" style={{ background: '#f1f5f9', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div className="progress-bar-fill" style={{ background: '#312e81', width: `${mod.percentage}%`, height: '100%', borderRadius: '4px' }}></div>
+                  </div>
                 </div>
-                <div className="progress-bar-track" style={{ background: '#f1f5f9', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div className="progress-bar-fill" style={{ background: '#312e81', width: `${mod.percentage}%`, height: '100%', borderRadius: '4px' }}></div>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p style={{ color: '#64748b', fontSize: '0.875rem' }}>No module activity recorded yet.</p>
+            )}
           </div>
         </section>
 
@@ -98,22 +123,26 @@ export default function AnalyticsDashboard() {
             <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a' }}>Recent system logs</h2>
           </div>
           <ul className="task-list" style={{ marginTop: '8px', listStyle: 'none', padding: 0 }}>
-            {stats.recentLogs?.map((log, index) => {
-              const tagStyle = 
-                log.type === 'Error' ? { background: '#fee2e2', color: '#991b1b' } :
-                log.type === 'Warning' ? { background: '#fef3c7', color: '#92400e' } :
-                { background: '#e0f2fe', color: '#0369a1' };
+            {stats.recentLogs && stats.recentLogs.length > 0 ? (
+              stats.recentLogs.map((log, index) => {
+                const tagStyle = 
+                  log.type === 'Error' ? { background: '#fee2e2', color: '#991b1b' } :
+                  log.type === 'Warning' ? { background: '#fef3c7', color: '#92400e' } :
+                  { background: '#e0f2fe', color: '#0369a1' };
 
-              return (
-                <li key={index} className="task-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
-                  <div>
-                    <span className="task-tag" style={{ ...tagStyle, padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, marginRight: '8px' }}>{log.type}</span>
-                    <strong style={{ fontSize: '0.875rem', color: '#1e293b' }}>{log.message}</strong>
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{log.time}</span>
-                </li>
-              );
-            })}
+                return (
+                  <li key={index} className="task-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <div>
+                      <span className="task-tag" style={{ ...tagStyle, padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, marginRight: '8px' }}>{log.type}</span>
+                      <strong style={{ fontSize: '0.875rem', color: '#1e293b' }}>{log.message}</strong>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{log.time}</span>
+                  </li>
+                );
+              })
+            ) : (
+              <p style={{ color: '#64748b', fontSize: '0.875rem' }}>No recent system logs.</p>
+            )}
           </ul>
         </section>
       </div>

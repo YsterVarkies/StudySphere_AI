@@ -8,7 +8,7 @@ export default function ModulesAndCohorts() {
   const [isModuleModalOpen, setIsModuleModalOpen] = useState(false);
   const [isCohortModalOpen, setIsCohortModalOpen] = useState(false);
   
-  // Edit tracking states (holds the item being edited, or null if creating new)
+  // Edit tracking states
   const [editingModuleCode, setEditingModuleCode] = useState(null);
   const [editingCohortId, setEditingCohortId] = useState(null);
 
@@ -18,12 +18,27 @@ export default function ModulesAndCohorts() {
   const [newCohortName, setNewCohortName] = useState('');
   const [newAcademicYear, setNewAcademicYear] = useState('2026');
 
+  // Helper to extract JWT token from studysphere_session storage
+  function getAuthHeader() {
+    try {
+      const sessionStr = localStorage.getItem('studysphere_session');
+      if (!sessionStr) return {};
+      const session = JSON.parse(sessionStr);
+      return session.token ? { 'Authorization': `Bearer ${session.token}` } : {};
+    } catch (e) {
+      console.error("Error reading session token:", e);
+      return {};
+    }
+  }
+
   useEffect(() => {
     fetchModulesAndCohorts();
   }, []);
 
   function fetchModulesAndCohorts() {
-    fetch('http://localhost:5000/api/modules')
+    fetch('http://localhost:5000/api/modules', {
+      headers: { ...getAuthHeader() }
+    })
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch data');
         return res.json();
@@ -54,7 +69,10 @@ export default function ModulesAndCohorts() {
 
     fetch(url, {
       method: method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...getAuthHeader() 
+      },
       body: JSON.stringify({
         code: newCode.trim().toUpperCase(),
         name: newName.trim(),
@@ -85,7 +103,10 @@ export default function ModulesAndCohorts() {
 
     fetch(url, {
       method: method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...getAuthHeader() 
+      },
       body: JSON.stringify({
         name: newCohortName.trim(),
         academicYear: parseInt(newAcademicYear, 10) || 2026
@@ -134,7 +155,8 @@ export default function ModulesAndCohorts() {
     if (!window.confirm(`Are you sure you want to delete module ${code}?`)) return;
 
     fetch(`http://localhost:5000/api/modules/${code}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { ...getAuthHeader() }
     })
       .then((res) => {
         if (!res.ok) throw new Error('Failed to delete module');
@@ -147,7 +169,8 @@ export default function ModulesAndCohorts() {
     if (!window.confirm('Are you sure you want to delete this cohort?')) return;
 
     fetch(`http://localhost:5000/api/cohorts/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { ...getAuthHeader() }
     })
       .then((res) => {
         if (!res.ok) throw new Error('Failed to delete cohort');
