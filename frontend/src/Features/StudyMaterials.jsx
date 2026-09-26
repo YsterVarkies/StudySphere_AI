@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"; 
+import { useEffect, useRef, useState } from "react";
 import AIChat from "./AIChat";
 import "./StudyMaterials.css"; // Import the CSS file for styling
 
@@ -74,8 +74,12 @@ const MOCK_DOCUMENTS = [
 
 function getSession() {
     try {
+        // check all common storage variations used across differnt team components
+        const rawToken = localStorage.getItem("token") || localStorage.getItem("accessToken");
+        if (rawToken) return { token: rawToken };
+
         const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user") || localStorage.getItem("token");
-        
+
         if (!sessionStr) return null;
 
         // If it looks like a raw token string rather than a JSON object, return it wrapped
@@ -85,7 +89,7 @@ function getSession() {
 
         const parsed = JSON.parse(sessionStr);
         if (typeof parsed === 'string') {
-            return {token: parsed};
+            return { token: parsed };
         }
         return parsed;
     } catch (error) {
@@ -93,14 +97,14 @@ function getSession() {
         const rawToken = localStorage.getItem("token");
         if (rawToken) return { token: rawToken };
 
-        console.error("Error parsing session from localStorage:", error); 
-        return null; 
+        console.error("Error parsing session from localStorage:", error);
+        return null;
     }
 }
 
 function getUserId() {
     const user = getSession();
-    return user?.user_id || user?.id || user?.studentNumber || user?.email || ""; 
+    return user?.user_id || user?.id || user?.studentNumber || user?.email || "";
 }
 
 function getToken() {
@@ -109,190 +113,201 @@ function getToken() {
 }
 
 function StudyMaterials() {
-    const fileInputRef = useRef(null); 
-    const [documents, setDocuments] = useState([]); 
-    const [modules, setModules] = useState([]); 
-    const [selectedModule, setSelectedModule] = useState(""); 
-    const [searchTerm, setSearchTerm] = useState(""); 
-    const [selectedFile, setSelectedFile] = useState(null); 
-    const [moduleId, setModuleId] = useState(""); 
-    const [loading, setLoading] = useState(false); 
-    const [uploading, setUploading] = useState(false); 
-    const [error, setError] = useState(""); 
-    const [message, setMessage] = useState(""); 
+    const fileInputRef = useRef(null);
+    const [documents, setDocuments] = useState([]);
+    const [modules, setModules] = useState([]);
+    const [selectedModule, setSelectedModule] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [moduleId, setModuleId] = useState("");
+    const [title, setTitle] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState("");
+    const [message, setMessage] = useState("");
 
     const [activeView, setActiveView] = useState("list"); // "list" or "chat"
     const [activeChatDoc, setActiveChatDoc] = useState(null);
 
     useEffect(() => {
-        loadDocuments(); 
-        loadModules(); 
+        loadDocuments();
+        loadModules();
     }, []);
 
     async function loadDocuments() {
 
-        if (typeof MOCK_DOCUMENTS !== 'undefined') { setDocuments(MOCK_DOCUMENTS); setLoading(false); return; }
+        /*  if (typeof MOCK_DOCUMENTS !== 'undefined') { setDocuments(MOCK_DOCUMENTS); setLoading(false); return; } */
 
-        setLoading(true); 
-        setError(""); 
+        setLoading(true);
+        setError("");
         try {
-            const userId = getUserId(); 
+            const userId = getUserId();
             const token = getToken();
 
-            const response = await fetch (
-                `${API_URL}/documents${userId ? `?userId=${encodeURIComponent(userId)}` : ""}`,
+            const response = await fetch(
+                `${API_URL}/documents${userId ? `?userid=${encodeURIComponent(userId)}` : ""}`,
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: token ? `Bearer ${token}` : "",
                     },
                 }
             );
 
             if (!response.ok) {
-                throw new Error("Could not load documents"); 
+                throw new Error(`Could not load documents (Status: ${response.status})`);
             }
 
-            const data = await response.json(); 
-            const list = data.documents || data.data || (Array.isArray(data) ? data : []); 
-            setDocuments(list); 
+            const data = await response.json();
+            const list = data.documents || data.data || (Array.isArray(data) ? data : []);
+            setDocuments(list);
 
         } catch (error) {
-            setError(error.message || "An error occurred while loading documents"); 
+            console.error("Load documents error: ", error);
+            setError(error.message || "An error occurred while loading documents");
         } finally {
-            setLoading(false); 
+            setLoading(false);
         }
     }
 
     async function loadModules() {
 
-        if (typeof MOCK_MODULES !== 'undefined') { setModules(MOCK_MODULES); return; }
+        /* if (typeof MOCK_MODULES !== 'undefined') { setModules(MOCK_MODULES); return; } */
 
         try {
             const token = getToken(); // token retrieval
             const response = await fetch(`${API_URL}/modules`, {
                 headers: {
-                    Authorization:`Bearer ${token}`, //authorization header
+                    Authorization: token ? `Bearer ${token}` : "", //authorization header
                 },
-            }); 
+            });
             if (!response.ok) {
-                throw new Error("Could not load modules"); 
+                throw new Error(`Could not load modules (Status: ${response.status})`);
             }
-            const data = await response.json(); 
-            setModules(data.modules || data.data || (Array.isArray(data) ? data : [])); 
+            const data = await response.json();
+            console.log("CHECKING FIRST MODULE:", data.modules[0]);
+        
+            const list = data.modules || data.data || (Array.isArray(data) ? data : []);
+            setModules(list);
+
         } catch (error) {
-            setError(error.message || "An error occurred while loading modules"); 
+            console.error("Load modules error: ", error);
+            setError(error.message || "An error occurred while loading modules");
         }
     }
+    
 
     function handleFileChange(event) {
-        const file = event.target.files?.[0]; 
+        const file = event.target.files?.[0];
 
-        if (!file) return; 
+        if (!file) return;
 
-        setError(""); 
-        setMessage(""); 
+        setError("");
+        setMessage("");
 
         if (!ALLOWED_TYPES.includes(file.type)) {
-            setError("Invalid file type. Please upload a PDF, DOCX, or TXT file."); 
-            event.target.value = ""; 
+            setError("Invalid file type. Please upload a PDF, DOCX, or TXT file.");
+            event.target.value = "";
             return;
         }
 
         if (file.size > MAX_FILE_SIZE) {
-            setError("File size exceeds the 25 MB limit."); 
-            event.target.value = ""; 
+            setError("File size exceeds the 25 MB limit.");
+            event.target.value = "";
             return;
         }
-        setSelectedFile(file); 
-        event.target.value = ""; 
+        setSelectedFile(file);
+        setTitle(file.name);
+        event.target.value = "";
     }
 
     async function handleUpload(targetModuleId) {
-        const activeModuleId = targetModuleId || moduleId; 
+        const activeModuleId = targetModuleId || moduleId;
         if (!selectedFile) {
             setError("Please select a file to upload.");
             return;
         }
 
-        if (!activeModuleId.trim()) {
+        if (!activeModuleId || !String(activeModuleId).trim()) {
             setError("Please select a module.");
             return;
         }
+        // --- REPLACE THE OLD INDEX LOGIC WITH THIS: ---
+        const selectedModule = modules.find(
+            (mod) => (mod.code || mod.module_code || mod.id || mod.module_id) === activeModuleId
+        );
 
-        setUploading(true); 
-        setError(""); 
-        setMessage(""); 
+        const numericModuleId = selectedModule 
+            ? (selectedModule.id || selectedModule.module_id || 1) 
+            : 1;
+        // ----------------------------------------------
+        
+        setUploading(true);
+        setError("");
+        setMessage("");
 
         try {
-            const userId = getUserId(); 
-            const formData = new FormData(); 
-            formData.append("file", selectedFile);  
-            formData.append("title", selectedFile.name); 
-            formData.append("moduleId", activeModuleId);
-            formData.append("module_id", activeModuleId);
-            formData.append("file_path", selectedFile.name);
-            formData.append("file_type", selectedFile.type);
-            formData.append("file_size", selectedFile.size); 
 
-            if (userId) {
-                formData.append("userId", userId); 
-            }
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+            formData.append("title", title || selectedFile.name);
+            formData.append("moduleId", numericModuleId);
 
-           const token = getToken();
+            const token = getToken();
 
-           const response = await fetch(`${API_URL}/documents`, {
+            const response = await fetch(`${API_URL}/documents`, {
                 method: "POST",
                 headers: {
-                    Authorization: `Bearer ${token}`,
+                    Authorization: token ? `Bearer ${token}` : "",
                 },
                 body: formData,
-           });
+            });
 
-            const data = await response.json().catch(() => ({})); 
+            const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                throw new Error(data.message || "Document upload failed"); 
+                throw new Error(data.message || `Document upload failed (Status: ${response.status})`);
             }
 
-            setMessage("Document uploaded successfully!"); 
-            setSelectedFile(null); 
-            setModuleId(""); 
-           
-            await loadDocuments(); 
+            setMessage("Document uploaded successfully!");
+            setSelectedFile(null);
+            setModuleId("");
+
+            await loadDocuments();
         } catch (error) {
-            setError(error.message || "An error occurred during upload"); 
+            console.error("Upload error: ", error);
+            setError(error.message || "An error occurred during upload");
         } finally {
-            setUploading(false); 
+            setUploading(false);
         }
     }
 
     function getDocumentName(document) {
-        return (document.name || document.file_name || document.fileName || document.title || document.filename || "Untitled Document"); 
+        return (document.name || document.file_name || document.fileName || document.title || document.filename || "Untitled Document");
     }
 
     function getDocumentModule(document) {
-        return (document.moduleName || document.module_name  || document.module || "Unknown Module"); 
+        return (document.moduleName || document.module_name || document.module || "Unknown Module");
     }
 
     function formatFileSize(size) {
-        if (!size) return "Unknown Size"; 
-        const bytes = Number(size); 
-        if (bytes < 1024) return `${bytes} B`; 
-        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`; 
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; 
+        if (!size) return "Unknown Size";
+        const bytes = Number(size);
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     }
 
-   const filteredDocuments = documents.filter((document) => {
-    const name = getDocumentName(document).toLowerCase();
-    const documentModuleId = String(
-        document.module_id ||
-        document.moduleId ||
-        ""
-    );
-    const matchesSearch = name.includes(searchTerm.toLowerCase());
-    const matchesModule = !selectedModule || documentModuleId === String(selectedModule);
-    return matchesSearch && matchesModule;
-   });
+    const filteredDocuments = documents.filter((document) => {
+        const name = getDocumentName(document).toLowerCase();
+        const documentModuleId = String(
+            document.module_id ||
+            document.moduleId ||
+            ""
+        );
+        const matchesSearch = name.includes(searchTerm.toLowerCase());
+        const matchesModule = !selectedModule || documentModuleId === String(selectedModule);
+        return matchesSearch && matchesModule;
+    });
 
     if (activeView === "chat") {
         return (
@@ -331,7 +346,7 @@ function StudyMaterials() {
                 <button
                     type="button"
                     className="study-materials-page__upload-top-btn"
-                    onClick={() => fileInputRef.current?.click()} 
+                    onClick={() => fileInputRef.current?.click()}
                 >
                     +  Upload document
                 </button>
@@ -355,20 +370,42 @@ function StudyMaterials() {
                             <strong>{selectedFile.name}</strong>
                             <span>({formatFileSize(selectedFile.size)})</span>
                         </div>
+
+                        {/* --- ADD TITLE INPUT FIELD HERE --- */}
+                        <div className="study-materials-module" style={{ marginBottom: "15px" }}>
+                            <label htmlFor="document-title">Document Title</label>
+                            <input
+                                id="document-title"
+                                type="text"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="Enter document title"
+                            />
+                        </div>
+                        {/* ---------------------------------- */}
+
+
+
                         <div className="study-materials-module">
                             <label htmlFor="study-materials-module">Module</label>
                             {modules.length > 0 ? (
-                                <select 
+                                <select
                                     id="study-materials-module"
                                     value={moduleId}
                                     onChange={(event) => setModuleId(event.target.value)}
                                 >
                                     <option value="">Select a Module</option>
                                     {modules.map((module) => {
-                                        const id = module.module_id || module.id || module.moduleId;
-                                        const name = module.module_name || module.name || module.moduleName || module.title || id || "Unnamed Module";
+                                        // Use module.code as the unique ID since your backend doesn't provide an explicit module_id/id
+                                        const modId = module.code || module.module_id || module.id;
+                                        const name = module.name || module.module_name || module.title || "Unnamed Module";
+                                        const code = module.code || module.module_code || "";
+
+                                        if (!modId) return null;
                                         return (
-                                            <option key={id} value={id}>{name}</option>
+                                            <option key={modId} value={modId}>
+                                                {name} {code ? `(${code})` : ''}
+                                            </option>
                                         );
                                     })}
                                 </select>
@@ -393,7 +430,7 @@ function StudyMaterials() {
                             <button
                                 type="button"
                                 className="study-materials-page__btn-confirm"
-                                onClick={() => handleUpload(moduleId)}
+                                onClick={() => handleUpload()}
                                 disabled={uploading || !moduleId}
                             >
                                 {uploading ? "Uploading..." : "Upload Document"}
@@ -406,10 +443,17 @@ function StudyMaterials() {
                 <select value={selectedModule} onChange={(event) => setSelectedModule(event.target.value)}>
                     <option value="">All Modules</option>
                     {modules.map((module) => {
-                        const id = module.module_id || module.id || module.moduleId;
-                        const name = module.module_name || module.name || module.moduleName || module.title || id || "Unnamed Module";
+                        // Use module.code as the unique ID since your backend doesn't provide an explicit module_id/id
+                        const modId = module.code || module.module_id || module.id;
+                        const name = module.name || module.module_name || module.title || "Unnamed Module";
+                        const code = module.code || module.module_code || "";
+
+                        if (!modId) return null;
                         return (
-                            <option key={id} value={id}>{name}</option>
+                            <option key={modId} value={modId}>
+                                {name} {code ? `(${code})` : ''}
+                            </option>
+                        
                         );
                     })}
                 </select>
@@ -429,29 +473,43 @@ function StudyMaterials() {
                     <p>Loading Documents...</p>
                 ) : (
                     <>
-                        {filteredDocuments.map((document) => (
-                            <article className="study-materials-page__document" key={document.document_id || document.id}>
-                                <div className="study-materials-page__document-content">
-                                    <div className="study-materials-page__document-header-row">
-                                        <div className="study-materials-page__document-icon">📄</div>
-                                        <div className="study-materials-page__document-info">
-                                            <h3>{getDocumentName(document)}</h3>
-                                            <p>{getDocumentModule(document)} · {formatFileSize(document.file_size || document.size)} </p>
+                            {filteredDocuments.map((document) => {
+                                const docId = document.document_id || document.id;
+                                // Build the full file URL if your backend returns a relative file path (e.g., "uploads/file.pdf")
+                                const fileUrl = document.file_path ? `${API_URL.replace('/api', '')}/${document.file_path}` : null;
+
+                                return (
+                                    <article className="study-materials-page__document" key={docId}>
+                                        <div className="study-materials-page__document-content">
+                                            <div className="study-materials-page__document-header-row">
+                                                <div className="study-materials-page__document-icon">📄</div>
+                                                <div className="study-materials-page__document-info">
+                                                    <h3>{getDocumentName(document)}</h3>
+                                                    <p>{getDocumentModule(document)} · {formatFileSize(document.file_size || document.size)}</p>
+
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
-                                <button className="study-materials-page__chat-btn" 
-                                        type="button"
-                                        onClick={() => {
-                                            setActiveChatDoc(document);
-                                            setActiveView("chat");
-                                        }}
-                                        >
-                                    💬 Chat with this
-                                </button>
-                            </article>
-                        ))}
-                        
+
+                                        {/* Actions Footer Container */}
+                                        <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
+                                            <button
+                                                className="study-materials-page__chat-btn"
+                                                type="button"
+                                                style={{ flex: 1, margin: 0 }}
+                                                onClick={() => {
+                                                    setActiveChatDoc(document);
+                                                    setActiveView("chat");
+                                                }}
+                                            >
+                                                💬 Chat with this
+                                            </button>
+
+                                        </div>
+                                    </article>
+                                );
+                            })}  
+
                         {/* Inline Upload DropZone Card */}
                         <div
                             className="study-materials-page__dropzone-card"
