@@ -6,13 +6,14 @@ const jwt = require("jsonwebtoken");
 
 const register = async (req, res) => {
     try {
-        const {
+       const {
             first_name,
             last_name,
             student_number,
             email,
             password,
-            year_of_study
+            year_of_study,
+            cohort_id
         } = req.body;
 
         const normalizedFirstName = typeof first_name === "string" ? first_name.trim() : "";
@@ -95,6 +96,7 @@ const register = async (req, res) => {
 
         // Create the user in the database
         const result = await User.createUser(
+            cohort_id,
             normalizedFirstName,
             normalizedLastName,
             normalizedStudentNumber,
@@ -112,7 +114,7 @@ const register = async (req, res) => {
                 student_number: normalizedStudentNumber,
                 email: normalizedEmail,
                 year_of_study: parsedYearOfStudy,
-                cohort_id: null,
+                cohort_id: cohort_id,
                 role: "student",
                 is_active: 1
             }

@@ -66,6 +66,7 @@ const updateUserStatus = async (userId, isActive) => {
 
 // Create a new user
 const createUser = async (
+    cohortId,
     firstName,
     lastName,
     studentNumber,
@@ -76,8 +77,9 @@ const createUser = async (
     const [result] = await db.query(
         `INSERT INTO \`USER\`
         (cohort_id, first_name, last_name, student_number, email, password_hash, year_of_study, role, is_active, created_at)
-        VALUES (NULL, ?, ?, ?, ?, ?, ?, 'student', 1, NOW())`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'student', 1, NOW())`,
         [
+            cohortId,
             firstName,
             lastName,
             studentNumber,
