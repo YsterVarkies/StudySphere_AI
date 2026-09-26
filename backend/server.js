@@ -551,7 +551,7 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-if (require.main === "module") {
+if (require.main === module) {
     app.listen(PORT, async () => {
         console.log(
             `Server running on http://localhost:${PORT}`
