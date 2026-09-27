@@ -2,76 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import AIChat from "./AIChat";
 import "./StudyMaterials.css"; // Import the CSS file for styling
 
-const API_URL = "http://localhost:5000/api"; // Replace with your actual API URL
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+//Global configuration constants 
+const API_URL = "http://localhost:5000/api"; // Backend API base URL
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB file size limit 
 
+//Allowed types for uploaded study materials
 const ALLOWED_TYPES = [
-    "application/pdf", // .pdf
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-    "text/plain", // .txt
+    "application/pdf", // .pdf files
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx files
+    "text/plain", // .txt files
 ];
-
-/* // --- COMMENT OUT THIS ENTIRE BLOCK WHEN DONE TESTING ---
-const MOCK_MODULES = [
-    { module_id: "mod-1", module_name: "CMPG 323 - Information Systems" },
-    { module_id: "mod-2", module_name: "JME 410 - Research Methodology" },
-    { module_id: "mod-3", module_name: "DEV 301 - Software Development" },
-    { module_id: "mod-4", module_name: "DBAS 211 - Database Systems" },
-    { module_id: "mod-5", module_name: "NETW 312 - Network Engineering" }
-];
-
-const MOCK_DOCUMENTS = [
-    {
-        document_id: "doc-1",
-        name: "Project_Requirements_Specification.pdf",
-        module_id: "mod-1",
-        moduleName: "CMPG 323 - Information Systems",
-        file_size: 2048500, // ~2 MB
-        file_type: "application/pdf"
-    },
-    {
-        document_id: "doc-2",
-        name: "Research_Proposal_Template.docx",
-        module_id: "mod-2",
-        moduleName: "JME 410 - Research Methodology",
-        file_size: 512000, // ~512 KB
-        file_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    },
-    {
-        document_id: "doc-3",
-        name: "API_Endpoints_Notes.txt",
-        module_id: "mod-3",
-        moduleName: "DEV 301 - Software Development",
-        file_size: 15400, // ~15 KB
-        file_type: "text/plain"
-    },
-    {
-        document_id: "doc-4",
-        name: "SQL_Joins_Cheat_Sheet.pdf",
-        module_id: "mod-4",
-        moduleName: "DBAS 211 - Database Systems",
-        file_size: 1250000, // ~1.2 MB
-        file_type: "application/pdf"
-    },
-    {
-        document_id: "doc-5",
-        name: "Subnetting_Practice_Problems.docx",
-        module_id: "mod-5",
-        moduleName: "NETW 312 - Network Engineering",
-        file_size: 840000, // ~840 KB
-        file_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    },
-    {
-        document_id: "doc-6",
-        name: "Weekly_Lecture_Slides_Week4.pdf",
-        module_id: "mod-1",
-        moduleName: "CMPG 323 - Information Systems",
-        file_size: 5400000, // ~5.4 MB
-        file_type: "application/pdf"
-    }
-];
- //-------------------------------------------------------/ */
-
+/**
+ * Retrieves and parses user session data from localStorage.
+ * Handles different variations of stored tokens across team components.
+ */
 function getSession() {
     try {
         // check all common storage variations used across differnt team components
@@ -79,7 +23,6 @@ function getSession() {
         if (rawToken) return { token: rawToken };
 
         const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user") || localStorage.getItem("token");
-
         if (!sessionStr) return null;
 
         // If it looks like a raw token string rather than a JSON object, return it wrapped
@@ -101,43 +44,51 @@ function getSession() {
         return null;
     }
 }
-
+/**
+ * Extracts the user ID or identifier from the current session.
+ */
 function getUserId() {
     const user = getSession();
     return user?.user_id || user?.id || user?.studentNumber || user?.email || "";
 }
-
+/**
+ * Extracts the active auth token for API requests.
+ */
 function getToken() {
     const session = getSession();
     return session?.token || session?.accessToken || localStorage.getItem("token") || "";
 }
-
+/**
+ * Main component for managing and viewing study materials.
+ */
 function StudyMaterials() {
+    // references and state hooks
     const fileInputRef = useRef(null);
-    const [documents, setDocuments] = useState([]);
-    const [modules, setModules] = useState([]);
-    const [selectedModule, setSelectedModule] = useState("");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [moduleId, setModuleId] = useState("");
-    const [title, setTitle] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [error, setError] = useState("");
-    const [message, setMessage] = useState("");
+    const [documents, setDocuments] = useState([]); //list of all loaded docuemnts
+    const [modules, setModules] = useState([]); // list of available modules
+    const [selectedModule, setSelectedModule] = useState(""); // filter selection for module view
+    const [searchTerm, setSearchTerm] = useState(""); //search input filter
+    const [selectedFile, setSelectedFile] = useState(null); // file staged for upload
+    const [moduleId, setModuleId] = useState(""); // target module for upload modal
+    const [title, setTitle] = useState(""); // custom title for document upload
+    const [loading, setLoading] = useState(false); // loading state for doucent fetch
+    const [uploading, setUploading] = useState(false); // upload network request state
+    const [error, setError] = useState(""); // error message banner
+    const [message, setMessage] = useState(""); // success message banner
 
-    const [activeView, setActiveView] = useState("list"); // "list" or "chat"
-    const [activeChatDoc, setActiveChatDoc] = useState(null);
+    const [activeView, setActiveView] = useState("list"); // view toggle: "list" or "chat"
+    const [activeChatDoc, setActiveChatDoc] = useState(null); //document selected for AI chat 
 
+    //fetch documents and modules on component mount
     useEffect(() => {
         loadDocuments();
         loadModules();
     }, []);
 
+    /**
+     * fetches study documents from the backend API
+     */
     async function loadDocuments() {
-
-        /*  if (typeof MOCK_DOCUMENTS !== 'undefined') { setDocuments(MOCK_DOCUMENTS); setLoading(false); return; } */
-
         setLoading(true);
         setError("");
         try {
@@ -169,10 +120,10 @@ function StudyMaterials() {
         }
     }
 
+    /**
+     * fetches available modules from the backend API
+     */
     async function loadModules() {
-
-        /* if (typeof MOCK_MODULES !== 'undefined') { setModules(MOCK_MODULES); return; } */
-
         try {
             const token = getToken(); // token retrieval
             const response = await fetch(`${API_URL}/modules`, {
@@ -184,8 +135,6 @@ function StudyMaterials() {
                 throw new Error(`Could not load modules (Status: ${response.status})`);
             }
             const data = await response.json();
-            console.log("CHECKING FIRST MODULE:", data.modules[0]);
-        
             const list = data.modules || data.data || (Array.isArray(data) ? data : []);
             setModules(list);
 
@@ -194,32 +143,39 @@ function StudyMaterials() {
             setError(error.message || "An error occurred while loading modules");
         }
     }
-    
 
+    /**
+     * handles file selection validation (type and size checks)
+     */
     function handleFileChange(event) {
         const file = event.target.files?.[0];
-
         if (!file) return;
 
         setError("");
         setMessage("");
 
+        //validate supported file extensions/types
         if (!ALLOWED_TYPES.includes(file.type)) {
             setError("Invalid file type. Please upload a PDF, DOCX, or TXT file.");
             event.target.value = "";
             return;
         }
 
+        // validate max file size constraints (25MB)
         if (file.size > MAX_FILE_SIZE) {
             setError("File size exceeds the 25 MB limit.");
             event.target.value = "";
             return;
         }
+
         setSelectedFile(file);
         setTitle(file.name);
         event.target.value = "";
     }
 
+    /**
+     * uploads the selected file along with metadata and module mapping to the backend.
+     */
     async function handleUpload(targetModuleId) {
         const activeModuleId = targetModuleId || moduleId;
         if (!selectedFile) {
@@ -231,16 +187,15 @@ function StudyMaterials() {
             setError("Please select a module.");
             return;
         }
-        // --- REPLACE THE OLD INDEX LOGIC WITH THIS: ---
-        const selectedModule = modules.find(
-            (mod) => (mod.code || mod.module_code || mod.id || mod.module_id) === activeModuleId
-        );
+        // match selected module option against id, module_id, or code to ensure correct linkage
+        const foundModule = modules.find(
+            (mod) => String(mod.id || mod.module_id || mod.code) === String(activeModuleId)
+        )
+        // resolve the precise identifier required by the backend database foreign key column
+        const targetModuleValue = foundModule
+            ? (foundModule.id || foundModule.module_id || foundModule.code)
+            : activeModuleId;
 
-        const numericModuleId = selectedModule 
-            ? (selectedModule.id || selectedModule.module_id || 1) 
-            : 1;
-        // ----------------------------------------------
-        
         setUploading(true);
         setError("");
         setMessage("");
@@ -250,7 +205,7 @@ function StudyMaterials() {
             const formData = new FormData();
             formData.append("file", selectedFile);
             formData.append("title", title || selectedFile.name);
-            formData.append("moduleId", numericModuleId);
+            formData.append("moduleId", targetModuleValue); //pass resolved ID/code to backend
 
             const token = getToken();
 
@@ -271,7 +226,9 @@ function StudyMaterials() {
             setMessage("Document uploaded successfully!");
             setSelectedFile(null);
             setModuleId("");
+            setTitle("");
 
+            // refresh document list after successful upload 
             await loadDocuments();
         } catch (error) {
             console.error("Upload error: ", error);
@@ -281,14 +238,17 @@ function StudyMaterials() {
         }
     }
 
+    // helper function to extract document name safely from various schema property names
     function getDocumentName(document) {
         return (document.name || document.file_name || document.fileName || document.title || document.filename || "Untitled Document");
     }
 
+    // helper function to extract module name safely from document objects
     function getDocumentModule(document) {
         return (document.moduleName || document.module_name || document.module || "Unknown Module");
     }
 
+    // formats raw file bytes into human-readable sizes (B, KB, MB)
     function formatFileSize(size) {
         if (!size) return "Unknown Size";
         const bytes = Number(size);
@@ -297,11 +257,14 @@ function StudyMaterials() {
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     }
 
+    //filter documents based on search keywords and selected module criteria
     const filteredDocuments = documents.filter((document) => {
         const name = getDocumentName(document).toLowerCase();
         const documentModuleId = String(
             document.module_id ||
             document.moduleId ||
+            document.moduleCode ||
+            document.code ||
             ""
         );
         const matchesSearch = name.includes(searchTerm.toLowerCase());
@@ -309,6 +272,7 @@ function StudyMaterials() {
         return matchesSearch && matchesModule;
     });
 
+    // render AI chat view if active view is switched
     if (activeView === "chat") {
         return (
             <main className="study-materials-page">
@@ -336,6 +300,7 @@ function StudyMaterials() {
         );
     }
 
+    // render main study materials dashboard view
     return (
         <main className="study-materials-page">
             <header className="study-materials-page__header">
@@ -351,6 +316,7 @@ function StudyMaterials() {
                     +  Upload document
                 </button>
             </header>
+            {/* Hidden file input element triggered via ref */}
             <input
                 ref={fileInputRef}
                 type="file"
@@ -358,10 +324,11 @@ function StudyMaterials() {
                 hidden
                 onChange={handleFileChange}
             />
+            {/* Status alerts */}
             {error && <div className="study-materials-page__error">{error}</div>}
             {message && <div className="study-materials-page__success">{message}</div>}
 
-            {/* Popup to pick a module when a file is selected */}
+            {/* Modal popup dialog when a file is staged for upload */}
             {selectedFile && (
                 <div className="study-materials-page__modal-backdrop">
                     <div className="study-materials-page__modal">
@@ -396,8 +363,8 @@ function StudyMaterials() {
                                 >
                                     <option value="">Select a Module</option>
                                     {modules.map((module) => {
-                                        // Use module.code as the unique ID since your backend doesn't provide an explicit module_id/id
-                                        const modId = module.code || module.module_id || module.id;
+                                        // Prioritize relational DB keys (id/module_id) falling back to code
+                                        const modId = module.id || module.module_id || module.code;
                                         const name = module.name || module.module_name || module.title || "Unnamed Module";
                                         const code = module.code || module.module_code || "";
 
@@ -439,12 +406,12 @@ function StudyMaterials() {
                     </div>
                 </div>
             )}
+            {/* Filter controls section (Module Dropdown & Search Baer) */}
             <section className="study-materials-page__controls">
                 <select value={selectedModule} onChange={(event) => setSelectedModule(event.target.value)}>
                     <option value="">All Modules</option>
                     {modules.map((module) => {
-                        // Use module.code as the unique ID since your backend doesn't provide an explicit module_id/id
-                        const modId = module.code || module.module_id || module.id;
+                        const modId = module.id || module.module_id || module.code;
                         const name = module.name || module.module_name || module.title || "Unnamed Module";
                         const code = module.code || module.module_code || "";
 
@@ -453,7 +420,7 @@ function StudyMaterials() {
                             <option key={modId} value={modId}>
                                 {name} {code ? `(${code})` : ''}
                             </option>
-                        
+
                         );
                     })}
                 </select>
@@ -468,47 +435,46 @@ function StudyMaterials() {
                 </div>
             </section>
 
+              {/* Documents Grid/ List Section */}      
             <section className="study-materials-page__documents">
                 {loading ? (
                     <p>Loading Documents...</p>
                 ) : (
                     <>
-                            {filteredDocuments.map((document) => {
-                                const docId = document.document_id || document.id;
-                                // Build the full file URL if your backend returns a relative file path (e.g., "uploads/file.pdf")
-                                const fileUrl = document.file_path ? `${API_URL.replace('/api', '')}/${document.file_path}` : null;
+                        {filteredDocuments.map((document) => {
+                            const docId = document.document_id || document.id;
+                            
+                            return (
+                                <article className="study-materials-page__document" key={docId}>
+                                    <div className="study-materials-page__document-content">
+                                        <div className="study-materials-page__document-header-row">
+                                            <div className="study-materials-page__document-icon">📄</div>
+                                            <div className="study-materials-page__document-info">
+                                                <h3>{getDocumentName(document)}</h3>
+                                                <p>{getDocumentModule(document)} · {formatFileSize(document.file_size || document.size)}</p>
 
-                                return (
-                                    <article className="study-materials-page__document" key={docId}>
-                                        <div className="study-materials-page__document-content">
-                                            <div className="study-materials-page__document-header-row">
-                                                <div className="study-materials-page__document-icon">📄</div>
-                                                <div className="study-materials-page__document-info">
-                                                    <h3>{getDocumentName(document)}</h3>
-                                                    <p>{getDocumentModule(document)} · {formatFileSize(document.file_size || document.size)}</p>
-
-                                                </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        {/* Actions Footer Container */}
-                                        <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
-                                            <button
-                                                className="study-materials-page__chat-btn"
-                                                type="button"
-                                                style={{ flex: 1, margin: 0 }}
-                                                onClick={() => {
-                                                    setActiveChatDoc(document);
-                                                    setActiveView("chat");
-                                                }}
-                                            >
-                                                💬 Chat with this
-                                            </button>
+                                    {/* Actions Footer Container */}
+                                    <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
+                                        <button
+                                            className="study-materials-page__chat-btn"
+                                            type="button"
+                                            style={{ flex: 1, margin: 0 }}
+                                            onClick={() => {
+                                                setActiveChatDoc(document);
+                                                setActiveView("chat");
+                                            }}
+                                        >
+                                            💬 Chat with this
+                                        </button>
 
-                                        </div>
-                                    </article>
-                                );
-                            })}  
+                                    </div>
+                                </article>
+                            );
+                        })}
 
                         {/* Inline Upload DropZone Card */}
                         <div
