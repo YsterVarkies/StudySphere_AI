@@ -291,7 +291,7 @@ function AIChat({ initialDocument }) {
                     Authorization: token ? `Bearer ${token}` : "",
                 },
                 body: JSON.stringify({
-                    user_id: getUserId(),
+                    userId: getUserId(),
                     sessionId: Number(activeSessionId),
                     message: currentQuestion,
                 }),
