@@ -1,19 +1,50 @@
-import { useEffect, useState } from "react"; 
+import { useEffect, useState } from "react";
 import "./RevisionHub.css";
 
 const API_URL = "http://localhost:5000/api";
 
 function getSession() {
     try {
-        return JSON.parse(localStorage.getItem("studysphere_session") || "null");
-    }catch {
+        const rawToken = localStorage.getItem("token") || localStorage.getItem("accessToken");
+
+        if (rawToken) {
+            return {
+                token: rawToken,
+            };
+        }
+        const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user");
+
+        if (!sessionStr) {
+            return null;
+        }
+
+        if (!sessionStr.startsWith("{") && !sessionStr.startsWith("[")) {
+            return {
+                token: sessionStr,
+            };
+        }
+        const parsed = JSON.parse(sessionStr);
+
+        if (typeof parsed === "string") {
+            return {
+                token: parsed,
+            };
+        }
+        return parsed;
+    } catch (error) {
+        console.error("Error reading session: ", error);
         return null;
     }
 }
 
 function getUserId() {
     const user = getSession();
-    return user?.user_id || user?.studentNumber || user?.email || "";
+    return (user?.user_id || user?.id || user?.studentNumber || user?.email || "");
+}
+
+function getToken() {
+    const session = getSession();
+    return (session?.token || session?.accessToken || localStorage.getItem("token") || "");
 }
 
 function RevisionHub() {
@@ -31,25 +62,38 @@ function RevisionHub() {
     useEffect(() => {
         loadDocuments();
     }, []);
-    
+
     async function loadDocuments() {
-        try{
+        try {
+            setError("");
+
             const userId = getUserId();
+            const token = getToken();
             const response = await fetch(
-                `${API_URL}/documents${userId ? `?user_id=${encodeURIComponent(userId)}` : ""}`
+                `${API_URL}/documents${userId ? `?userid=${encodeURIComponent(userId)}` : ""}`,
+                {
+                    headers: {
+                        Authorization: token ? `Bearer ${token}` : "",
+                    },
+                }
             );
 
-            if (!response.ok) return;
+            if (!response.ok) {
+                throw new Error(`Could not load documents (${response.status})`);
+            }
 
             const data = await response.json();
 
-            setDocuments(
+            const list =
                 data.documents ||
                 data.data ||
-                (Array.isArray(data) ? data : [])
-            );
-        }catch {
-            //Documents can be unavailable without preventing the page form loading.
+                (Array.isArray(data) ? data : []);
+
+            setDocuments(list);
+        } catch (error) {
+            console.error("Load documents error:", error);
+
+            setError(error.message || "Could not load study materials.");
         }
     }
 
@@ -67,57 +111,115 @@ function RevisionHub() {
         );
     }
 
+    function getDocumentModuleId(document) {
+        return (
+            document.module_id ||
+            document.moduleId
+        );
+    }
+
+    function getSelectedDocument() {
+        return documents.find(
+            (document) => String(getDocumentId(document)) === String(selectedDocument)
+        );
+    }
+
     async function generate(type) {
+        setError("");
+
         if (!selectedDocument) {
             setError("Please select a document.");
             return;
         }
+        const document = getSelectedDocument();
+
+        if (!document) {
+            setError("The selected document could not be found.");
+            return;
+        }
+        const documentId = getDocumentId(document);
+
+        const moduleId = getDocumentModuleId(document);
+
+        if (!documentId) {
+            setError("The selected document does not have a document ID.");
+            return;
+        }
+
+        if (!moduleId) {
+            setError("The selected document does not have a module ID.");
+            return;
+        }
+
+        const requestedNumber = Number(number);
+
+        if (!Number.isInteger(requestedNumber) || requestedNumber < 1) {
+            setError("Please enter a valid number greater than 0.");
+            return;
+        }
 
         setLoading(true);
-        setError("");
         setContent(null);
         setMode(type);
         setCurrentQuestion(0);
         setSelectedAnswer(null);
         setShowAnswer(false);
 
-        const endpoint = 
-        type === "quiz"
-        ? `${API_URL}/quizzes/generate`
-        : `${API_URL}/flashcards/generate`;
+        const endpoint =
+            type === "quiz"
+                ? `${API_URL}/quizzes/generate`
+                : `${API_URL}/flashcards/generate`;
 
-        try{
+        try {
+            const token = getToken();
+
+            const requestBody = type === "quiz" ? {
+                userId: getUserId(),
+                documentId: Number(documentId),
+                moduleId: Number(moduleId),
+                numberOfQuestions: requestedNumber,
+                title: `Quiz - ${getDocumentName(document)}`,
+            }
+                : {
+                    userId: getUserId(),
+                    documentId: Number(documentId),
+                    moduleId: Number(moduleId),
+                    numberOfCards: requestedNumber,
+                    title: `Flashcards - ${getDocumentName(document)}`,
+                };
+            console.log(`Generating ${type}:`, requestBody);
+
             const response = await fetch(endpoint, {
                 method: "POST",
                 headers: {
-                    "Content-Type" : "application/json",
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
                 },
-                body: JSON.stringify({
-                    user_id: getUserId(),
-                    document_id: selectedDocument,
-                    number,
-                }),
+                body: JSON.stringify(requestBody),
             });
 
             const data = await response.json().catch(() => ({}));
 
-            if (!response.ok){
+            console.log(`${type} response:`, data);
+
+            if (!response.ok) {
                 throw new Error(
                     data.message || `Could not generate ${type}.`
                 );
             }
 
-            const generated = 
-            data.quiz ||
-            data.flashcards ||
-            data.questions ||
-            data.cards ||
-            data.data ||
-            data;
+            const generated =
+                data.data ||
+                data.quiz ||
+                data.flashcards ||
+                data.questions ||
+                data.cards ||
+                data;
 
             setContent(generated);
         } catch (error) {
-            setError(error.message);
+            console.error(`Generate ${type} error:`, error);
+            setError(error.message || `Could not generate ${type}.`);
         } finally {
             setLoading(false);
         }
@@ -127,14 +229,31 @@ function RevisionHub() {
         if (Array.isArray(content)) return content;
         if (content?.questions) return content.questions;
         if (content?.quiz) return content.quiz;
+        if (content?.data?.questions) return content.data.questions;
         return [];
     }
 
     function getCards() {
-        if (Array.isArray(content)) return content;
-        if (content?.flashcards) return content.flashcards;
-        if (content?.cards) return content.cards;
-        return[];
+        if (Array.isArray(content)) {
+            return content;
+        }
+
+        if (content?.flashcards) {
+            return content.flashcards;
+        }
+
+        if (content?.cards) {
+            return content.cards;
+        }
+
+        if (content?.data?.flashcards) {
+            return content.data.flashcards;
+        }
+
+        if (content?.data?.cards) {
+            return content.data.cards;
+        }
+        return [];
     }
 
     const questions = getQuestions();
@@ -150,17 +269,27 @@ function RevisionHub() {
             <section className="revision-hub-page__controls">
                 <label>Study material
                     <select
-                    value={selectedDocument}
-                    onChange={(event) => 
-                        setSelectedDocument(event.target.value)
-                    }
+                        value={selectedDocument}
+                        onChange={(event) => {
+                            setSelectedDocument(event.target.value);
+                            setContent(null);
+                            setMode(null);
+                            setError("");
+                            setCurrentQuestion(0);
+                            setSelectedAnswer(null);
+                            setShowAnswer(false);
+                        }}
                     >
                         <option
-                        value="">
+                            value="">
                             Select a document
                         </option>
                         {documents.map((document) => {
                             const id = getDocumentId(document);
+                            if (!id) {
+                                return null;
+                            }
+
                             return (
                                 <option key={id} value={id}>
                                     {getDocumentName(document)}
@@ -174,37 +303,39 @@ function RevisionHub() {
                     Number
 
                     <input
-                    type="number"
-                    min="1"
-                    value={number}
-                    onChange={(event) => 
-                        setNumber(Number(event.target.value))
-                    }
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={number}
+                        onChange={(event) => {
+                            const nextValue = Number(event.target.value);
+                            setNumber(Number.isNaN(nextValue) ? 1 : nextValue);
+                        }}
                     />
                 </label>
 
                 <div className="revision-hub-page__buttons">
                     <button
-                    type="button"
-                    onClick={() => generate("quiz")}
-                    disabled={loading}
+                        type="button"
+                        onClick={() => generate("quiz")}
+                        disabled={loading || !selectedDocument}
                     >
                         {
                             loading && mode === "quiz"
-                            ? "Generating..."
-                            : "Generating Quiz"
+                                ? "Generating..."
+                                : "Generating Quiz"
                         }
                     </button>
 
                     <button
-                    type="button"
-                    onClick={() => generate("flashcards")}
-                    disabled={loading}
+                        type="button"
+                        onClick={() => generate("flashcards")}
+                        disabled={loading || !selectedDocument}
                     >
                         {
                             loading && mode === "flashcards"
-                            ? "Generating..."
-                            : "Create Flashcards"
+                                ? "Generating..."
+                                : "Create Flashcards"
                         }
                     </button>
                 </div>
@@ -220,22 +351,28 @@ function RevisionHub() {
                 <section className="revision-hub-page__content">
                     <h2>Quiz</h2>
                     {questions.map((question, index) => {
-                        const text = 
-                        question.question ||
-                        question.text ||
-                        question.prompt ||
-                        `Question ${index + 1}`;
+                        const text =
+                            question.question ||
+                            question.text ||
+                            question.prompt ||
+                            `Question ${index + 1}`;
 
-                        const options = 
-                        question.options ||
-                        question.choices ||
-                        question.answers ||
-                        [];
+                        const options =
+                            question.options ||
+                            question.choices ||
+                            question.answers ||
+                            [];
+
+                        const correctAnswer =
+                            question.answer ||
+                            question.correctAnswer ||
+                            question.correct_option ||
+                            question.correctOption;
 
                         return (
                             <article
-                            className="revision-hub-page__question"
-                            key={index} 
+                                className="revision-hub-page__question"
+                                key={index}
                             >
                                 <h3>
                                     {index + 1}.{text}
@@ -243,109 +380,110 @@ function RevisionHub() {
 
                                 <div>
                                     {options.map((option, optionIndex) => {
-                                        const value = 
-                                        typeof option === "string"
-                                        ? option
-                                        : option.text || option.answer || "";
+                                        const value =
+                                            typeof option === "string"
+                                                ? option
+                                                : option.text || option.answer || "";
 
                                         return (
                                             <button
-                                            type="button"
-                                            key={optionIndex}
-                                            className= {
-                                                selectedAnswer === optionIndex
-                                                ? "revision-hub-page__option revision-hub-page__option--selected"
-                                                : "revision-hub-page__option"
-                                            } 
-                                            onClick={() => {
-                                                setCurrentQuestion(index);
-                                                setSelectedAnswer(optionIndex);
-                                            }}
+                                                type="button"
+                                                key={optionIndex}
+                                                className={
+                                                    selectedAnswer === optionIndex
+                                                        ? "revision-hub-page__option revision-hub-page__option--selected"
+                                                        : "revision-hub-page__option"
+                                                }
+                                                onClick={() => {
+                                                    setCurrentQuestion(index);
+                                                    setSelectedAnswer(optionIndex);
+                                                }}
                                             >
                                                 {value}
                                             </button>
                                         );
                                     })}
                                 </div>
+
+                                {showAnswer && (
+                                    <p className="revision-hub-page__correct-answer">
+                                        <strong>
+                                            Answer:
+                                        </strong>{" "}
+                                        {correctAnswer ||
+                                            "Answer provided by backend."}
+                                    </p>
+                                )}
                             </article>
                         );
                     })}
 
                     <button
-                    type="button"
-                    className="revision-hub-page__answer-button"
-                    onClick={() => setShowAnswer(!showAnswer)}
+                        type="button"
+                        className="revision-hub-page__answer-button"
+                        onClick={() => setShowAnswer(!showAnswer)}
                     >
-                        {showAnswer ? "Hide answers": "Show answers"}
+                        {showAnswer ? "Hide answers" : "Show answers"}
                     </button>
-
-                    {showAnswer && (
-                        <div className="revision-hub-page__answers">
-                            {questions.map((question, index) => (
-                                <p key={index}>
-                                    <strong>{index + 1}:</strong>{" "}
-                                    {question.answer ||
-                                        question.correctAnswer ||
-                                        question.correct_option ||
-                                        "Answer provided by backend."}
-                                </p>
-                            ))}
-                        </div>
-                    )}
                 </section>
             )}
+
 
             {mode === "flashcards" && cards.length > 0 && (
                 <section className="revision-hub-page__flashcards">
                     <h2>Flashcards</h2>
 
-                    {cards.map((card, index) => (
-                        <button
-                        type="button"
-                        className="revision-hub-page__flashcard"
-                        key={index}
-                        onClick={() => {
-                            setCurrentQuestion(index);
-                            setShowAnswer(!showAnswer);
-                        }}
-                        >
-                            {!showAnswer || currentQuestion !== index ? (
-                                <>
-                                <span>Question</span>
-                                <strong>
-                                    {card.question ||
-                                    card.front ||
-                                    card.term ||
-                                    "Question"}
-                                </strong>
-                                </>
-                            ) : (
-                                <>
-                                <span>Answer</span>
-                                <strong>
-                                    {card.answer ||
-                                    card.back ||
-                                    card.definition ||
-                                    "Answer"}
-                                </strong>
-                                </>
-                            )}
-                        </button>
-                    ))}
+                    {cards.map((card, index) => {
+                        const isShowingAnswer = showAnswer && currentQuestion === index;
+                        return (
+                            <button
+                                type="button"
+                                className="revision-hub-page__flashcard"
+                                key={index}
+                                onClick={() => {
+                                    setCurrentQuestion(index);
+                                    setShowAnswer(isShowingAnswer ? false : true);
+                                }}
+                            >
+                                {!isShowingAnswer ? (
+                                    <>
+                                        <span>Question</span>
+                                        <strong>
+                                            {card.question ||
+                                                card.front ||
+                                                card.term ||
+                                                "Question"}
+                                        </strong>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>Answer</span>
+                                        <strong>
+                                            {card.answer ||
+                                                card.back ||
+                                                card.definition ||
+                                                "Answer"}
+                                        </strong>
+                                    </>
+                                )}
+                            </button>
+                        );
+                    }
+                    )}
                 </section>
             )}
 
             {!loading &&
-            mode &&
-            questions.length === 0 &&
-            cards.length === 0 &&
-            !error && (
-                <div className="revision-hub-page__empty">
-                    No revision content was returned.
-                </div>
-            )}
+                mode &&
+                questions.length === 0 &&
+                cards.length === 0 &&
+                !error && (
+                    <div className="revision-hub-page__empty">
+                        No revision content was returned.
+                    </div>
+                )}
         </main>
     );
-} 
+}
 
 export default RevisionHub;

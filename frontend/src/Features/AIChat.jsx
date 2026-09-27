@@ -8,7 +8,7 @@ function getSession() {
         const rawToken = localStorage.getItem("token") || localStorage.getItem("accessToken");
         if (rawToken) return { token: rawToken };
 
-        const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user") || localStorage.getItem("token");
+        const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user");
         if (!sessionStr) return null;
 
         if (!sessionStr.startsWith("{") && !sessionStr.startsWith("[")) {
@@ -21,6 +21,7 @@ function getSession() {
         }
         return parsed;
     } catch (error) {
+        console.error("Error reading session:", error);
         const rawToken = localStorage.getItem("token");
         if (rawToken) return { token: rawToken };
         return null;
@@ -29,38 +30,69 @@ function getSession() {
 
 function getUserId() {
     const user = getSession();
-    return user?.user_id || user?.id || user?.studentNumber || user?.email || "1";
+    return (
+        user?.user_id ||
+        user?.id ||
+        user?.studentNumber ||
+        user?.email ||
+        ""
+    );
+
 }
 
 function getToken() {
     const session = getSession();
-    return session?.token || session?.accessToken || localStorage.getItem("token") || "";
+    return (
+        session?.token ||
+        session?.accessToken ||
+        localStorage.getItem("token") ||
+        ""
+    );
 }
 
 function AIChat({ initialDocument }) {
+    const initialDocumentId = initialDocument ? initialDocument.document_id || initialDocument.id : null;
     const [documents, setDocuments] = useState([]);
-    const [selectedDocuments, setSelectedDocuments] = useState(initialDocument ? [initialDocument.document_id || initialDocument.id] : []);
+    const [selectedDocuments, setSelectedDocuments] = useState(initialDocumentId ? [initialDocumentId] : []);
     const [sessionId, setSessionId] = useState(null);
     const [question, setQuestion] = useState("");
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [initialisingSession, setInitialisingSession] = useState(false);
     const [error, setError] = useState("");
 
+
     useEffect(() => {
-        loadDocuments();
+        loadDocuments(); // load the user's documents
     }, []);
 
+    /**
+     * if studymaterials opened AI chat with a specific document,
+     * make sure that document is selected
+     */
     useEffect(() => {
-        if (initialDocument) {
-            const docId = initialDocument.document_id || initialDocument.id;
-            if (docId && !selectedDocuments.includes(docId)) {
-                setSelectedDocuments([docId]);
-            }
+        if (!initialDocument) {
+            return;
         }
+        const docId = initialDocument.document_id || initialDocument.id;
+
+        if (!docId) {
+            return;
+        }
+        setSelectedDocuments([docId]);
     }, [initialDocument]);
 
+    /**
+     * whenever the selected docuemnt changes, create a new
+     * chat session for that docuement.
+     */
     useEffect(() => {
-        getOrCreateSession();
+        if (selectedDocuments.length === 0) {
+            setSessionId(null);
+            setMessages([]);
+            return;
+        }
+        initialiseSession();
     }, [selectedDocuments]);
 
     async function loadDocuments() {
@@ -76,69 +108,29 @@ function AIChat({ initialDocument }) {
                 }
             );
 
-            if (!response.ok) return;
+            if (!response.ok) {
+                throw new Error(`Could not load documents (${response.status})`);
+            }
 
             const data = await response.json();
-            setDocuments(
+
+            const list =
                 data.documents ||
                 data.data ||
-                (Array.isArray(data) ? data : [])
+                (Array.isArray(data) ? data : []);
+
+            setDocuments(list);
+        } catch (error) {
+            console.error("Load documents error: ", error);
+
+            setError(
+                error.message || "Could not load study materials."
             );
-        } catch {
-            // fallback silently
-        }
-    }
-
-    async function getOrCreateSession() {
-        try {
-            const userId = getUserId();
-            const token = getToken();
-            const documentId = selectedDocuments.length > 0 ? selectedDocuments[0] : null;
-            
-            // Match the backend model's expected property names (userId, documentId, moduleId)
-            const moduleId = initialDocument?.module_id || initialDocument?.moduleId || 1;
-
-            // Fetch existing chat sessions for this user
-            const res = await fetch(`${API_URL}/chat/session_id?userId=${encodeURIComponent(userId)}`, {
-                headers: {
-                    Authorization: token ? `Bearer ${token}` : "",
-                },
-            });
-            const data = await res.json();
-            const sessions = data.data || data.sessions || (Array.isArray(data) ? data : []);
-
-            if (sessions.length > 0) {
-                // Use the most recent session
-                setSessionId(sessions[0].session_id || sessions[0].id);
-            } else {
-                // Create a new session matching backend expectations
-                const createRes = await fetch(`${API_URL}/chat/sessions`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: token ? `Bearer ${token}` : "",
-                    },
-                    body: JSON.stringify({
-                        userId: userId,
-                        moduleId: moduleId,
-                        documentId: documentId,
-                        title: "Study session"
-                    })
-                });
-                const createData = await createRes.json();
-                
-                if (createRes.ok && (createData.success || createData.data)) {
-                    const newSession = createData.data || createData;
-                    setSessionId(newSession.session_id || newSession.id || newSession.insertId);
-                }
-            }
-        } catch (err) {
-            console.error("Session initialization error:", err);
         }
     }
 
     function getDocumentId(document) {
-        return document.document_id || document.id;
+        return (document.document_id || document.id);
     }
 
     function getDocumentName(document) {
@@ -151,23 +143,124 @@ function AIChat({ initialDocument }) {
         );
     }
 
-    function toggleDocument(id) {
-        setSelectedDocuments((current) =>
-            current.includes(id)
-                ? current.filter((item) => item !== id)
-                : [...current, id]
+    function getDocumentModuleId(document) {
+        return (document.module_id || document.moduleId);
+    }
+
+    /**
+     * Create a new chat session and return the session id. 
+     */
+    async function initialiseSession() {
+        if (selectedDocuments.length === 0) {
+            return null;
+        }
+        const documentId = selectedDocuments[0];
+
+        const selectedDocument = documents.find(
+            (document) => String(getDocumentId(document)) === String(documentId)
         );
+        /**
+         * when opened directly from studyMaterials, the 
+         * initialDocument already contains module_id.
+         */
+        const moduleId =
+            selectedDocument?.module_id ||
+            selectedDocument?.moduleId ||
+            initialDocument?.module_id ||
+            initialDocument?.moduleId;
+
+        if (!moduleId) {
+            setError("The selected document does not have a module ID.");
+            return null;
+        }
+        try {
+            setInitialisingSession(true);
+            setError("");
+
+            const userId = getUserId();
+            const token = getToken();
+
+            const response = await fetch(`${API_URL}/chat/sessions`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: token ? `Bearer ${token}` : "",
+                    },
+                    body: JSON.stringify({
+                        userId: userId,
+                        moduleId: Number(moduleId),
+                        documentId: Number(documentId),
+                        title: `Study Session - ${getDocumentName(selectedDocument || initialDocument || {})}`,
+                    }),
+                }
+            );
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(data.message || "Could not create chat session.");
+            }
+            const newSession = data.data || data;
+
+            const newSessionId =
+                newSession.chat_session_id ||
+                newSession.session_id ||
+                newSession.id ||
+                newSession.insertId;
+
+            if (!newSessionId) {
+                throw new Error("The server created a chat session but did not return its ID.");
+            }
+            setSessionId(newSessionId);
+
+            /**
+             * start a fresh conversation whenever the document changes.
+             */
+            setMessages([]);
+
+            return newSessionId;
+        } catch (error) {
+            console.error("Session initialisation error: ", error);
+
+            setSessionId(null);
+
+            setError(error.message || "Could not initialise the AI chat.");
+            return null;
+        } finally {
+            setInitialisingSession(false);
+        }
+    }
+
+    function toggleDocument(id) {
+        setSelectedDocuments((current) => {
+            if (current.includes(id)) {
+                return current.filter((item) => item !== id
+                );
+            }
+            return [id];
+        });
     }
 
     async function sendQuestion(event) {
         event.preventDefault();
 
-        if (!question.trim() || loading) return;
+        if (!question.trim() || loading) {
+            return;
+        }
+
+        if (selectedDocuments.length === 0) {
+            setError("Please select a document first.");
+            return;
+        }
 
         const currentQuestion = question.trim();
         setQuestion("");
         setError("");
 
+        /**
+         * Immediately display the user's question.
+         */
         setMessages((current) => [
             ...current,
             {
@@ -179,10 +272,15 @@ function AIChat({ initialDocument }) {
         setLoading(true);
 
         try {
+            //make sure we have a valid session
             let activeSessionId = sessionId;
+
             if (!activeSessionId) {
-                await getOrCreateSession();
-                activeSessionId = sessionId;
+                activeSessionId = await initialisingSession();
+            }
+
+            if (!activeSessionId) {
+                throw new Error("Could not create a chat session.");
             }
 
             const token = getToken();
@@ -194,7 +292,7 @@ function AIChat({ initialDocument }) {
                 },
                 body: JSON.stringify({
                     user_id: getUserId(),
-                    sessionId: activeSessionId,
+                    sessionId: Number(activeSessionId),
                     message: currentQuestion,
                 }),
             });
@@ -207,8 +305,9 @@ function AIChat({ initialDocument }) {
                 );
             }
 
-            const answer = 
+            const answer =
                 data.data?.aiReply ||
+                data.aiReply ||
                 data.answer ||
                 data.response ||
                 data.message ||
@@ -224,8 +323,22 @@ function AIChat({ initialDocument }) {
                 },
             ]);
         } catch (error) {
-            setError(error.message);
-        } finally {
+            console.error("AI chat error:", error);
+
+            //Remove the user's message if the request fialed.
+            setMessages((current) => {
+                if (
+                    current.length > 0 && current[current.length - 1].role === "user"
+                ) {
+                    return current.slice(0, -1);
+                }
+                return current;
+            });
+            setQuestion(currentQuestion);
+
+            setError(error.message || "Somthing went wrong while contacting the AI.");
+        }
+        finally {
             setLoading(false);
         }
     }
@@ -256,7 +369,7 @@ function AIChat({ initialDocument }) {
                                     }
                                     onClick={() => toggleDocument(id)}
                                 >
-                                    📄 {getDocumentName(document)}
+                                    📄 {" "} {getDocumentName(document)}
                                 </button>
                             );
                         })}
@@ -268,7 +381,7 @@ function AIChat({ initialDocument }) {
                 <div className="ai-chat-page__messages">
                     {messages.length === 0 && (
                         <div className="ai-chat-page__empty">
-                            Ask a question to get started.
+                           {initialisingSession ? "Preparing your AI Study Session..." : "Ask a question to get started."}
                         </div>
                     )}
 
@@ -295,9 +408,9 @@ function AIChat({ initialDocument }) {
                                             {typeof source === "string"
                                                 ? source
                                                 : source.file_name ||
-                                                  source.name ||
-                                                  source.title ||
-                                                  `Source ${sourceIndex + 1}`}
+                                                source.name ||
+                                                source.title ||
+                                                `Source ${sourceIndex + 1}`}
                                         </span>
                                     ))}
                                 </div>
@@ -305,9 +418,9 @@ function AIChat({ initialDocument }) {
                         </div>
                     ))}
 
-                    {loading && (
+                    {(loading || initialisingSession) && (
                         <div className="ai-chat-page__message ai-chat-page__message--assistant">
-                            Thinking...
+                            {initialisingSession ? "Preparing session..." : "Thinking..."}
                         </div>
                     )}
                 </div>
@@ -324,9 +437,9 @@ function AIChat({ initialDocument }) {
                         value={question}
                         onChange={(event) => setQuestion(event.target.value)}
                         placeholder="Ask a question..."
-                        disabled={loading}
+                        disabled={loading || initialisingSession}
                     />
-                    <button type="submit" disabled={loading || !question.trim()}>
+                    <button type="submit" disabled={loading ||initialisingSession || !question.trim() || selectedDocuments.length === 0}>
                         {loading ? "Sending..." : "Send"}
                     </button>
                 </form>
