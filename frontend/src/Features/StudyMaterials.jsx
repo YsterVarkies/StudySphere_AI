@@ -12,52 +12,42 @@ const ALLOWED_TYPES = [
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx files
     "text/plain", // .txt files
 ];
-/**
- * Retrieves and parses user session data from localStorage.
- * Handles different variations of stored tokens across team components.
- */
+
 function getSession() {
     try {
-        // check all common storage variations used across differnt team components
-        const rawToken = localStorage.getItem("token") || localStorage.getItem("accessToken");
-        if (rawToken) return { token: rawToken };
+        const raw = localStorage.getItem("studysphere_session");
 
-        const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user") || localStorage.getItem("token");
-        if (!sessionStr) return null;
-
-        // If it looks like a raw token string rather than a JSON object, return it wrapped
-        if (!sessionStr.startsWith("{") && !sessionStr.startsWith("[")) {
-            return { token: sessionStr };
+        if (!raw) {
+            return {
+                token: "",
+                user: null,
+            };
         }
 
-        const parsed = JSON.parse(sessionStr);
-        if (typeof parsed === 'string') {
-            return { token: parsed };
-        }
-        return parsed;
+        const session = JSON.parse(raw);
+
+        return {
+            token: session?.token || "",
+            user: session?.user || null,
+        };
     } catch (error) {
-        // Fallback if it's just a raw token string stored under 'token'
-        const rawToken = localStorage.getItem("token");
-        if (rawToken) return { token: rawToken };
+        console.error("Could not read stored session:", error);
 
-        console.error("Error parsing session from localStorage:", error);
-        return null;
+        return {
+            token: "",
+            user: null,
+        };
     }
 }
-/**
- * Extracts the user ID or identifier from the current session.
- */
+
 function getUserId() {
-    const user = getSession();
-    return user?.user_id || user?.id || user?.studentNumber || user?.email || "";
+    return getSession()?.user?.user_id || "";
 }
-/**
- * Extracts the active auth token for API requests.
- */
+
 function getToken() {
-    const session = getSession();
-    return session?.token || session?.accessToken || localStorage.getItem("token") || "";
+    return getSession()?.token || "";
 }
+
 /**
  * Main component for managing and viewing study materials.
  */
@@ -92,17 +82,13 @@ function StudyMaterials() {
         setLoading(true);
         setError("");
         try {
-            const userId = getUserId();
             const token = getToken();
 
-            const response = await fetch(
-                `${API_URL}/documents${userId ? `?userid=${encodeURIComponent(userId)}` : ""}`,
-                {
-                    headers: {
-                        Authorization: token ? `Bearer ${token}` : "",
-                    },
-                }
-            );
+            const response = await fetch(`${API_URL}/documents`, {
+                headers: {
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+            });
 
             if (!response.ok) {
                 throw new Error(`Could not load documents (Status: ${response.status})`);
@@ -435,7 +421,7 @@ function StudyMaterials() {
                 </div>
             </section>
 
-              {/* Documents Grid/ List Section */}      
+            {/* Documents Grid/ List Section */}
             <section className="study-materials-page__documents">
                 {loading ? (
                     <p>Loading Documents...</p>
@@ -443,7 +429,7 @@ function StudyMaterials() {
                     <>
                         {filteredDocuments.map((document) => {
                             const docId = document.document_id || document.id;
-                            
+
                             return (
                                 <article className="study-materials-page__document" key={docId}>
                                     <div className="study-materials-page__document-content">

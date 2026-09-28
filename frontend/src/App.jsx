@@ -116,8 +116,10 @@ async function loadDashboardData(token) {
 
 async function refreshDashboardForUser(user) {
   if (!user) return dashboardEmptyState
+
   try {
-    return await loadDashboardData(user.token)
+    const session = loadSession()
+    return await loadDashboardData(session?.token || '')
   } catch {
     return dashboardEmptyState
   }
