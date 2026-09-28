@@ -5,46 +5,37 @@ const API_URL = "http://localhost:5000/api";
 
 function getSession() {
     try {
-        const rawToken = localStorage.getItem("token") || localStorage.getItem("accessToken");
+        const raw = localStorage.getItem("studysphere_session");
 
-        if (rawToken) {
+        if (!raw) {
             return {
-                token: rawToken,
+                token: "",
+                user: null,
             };
         }
-        const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user");
 
-        if (!sessionStr) {
-            return null;
-        }
+        const session = JSON.parse(raw);
 
-        if (!sessionStr.startsWith("{") && !sessionStr.startsWith("[")) {
-            return {
-                token: sessionStr,
-            };
-        }
-        const parsed = JSON.parse(sessionStr);
-
-        if (typeof parsed === "string") {
-            return {
-                token: parsed,
-            };
-        }
-        return parsed;
+        return {
+            token: session?.token || "",
+            user: session?.user || null,
+        };
     } catch (error) {
-        console.error("Error reading session: ", error);
-        return null;
+        console.error("Could not read stored session:", error);
+
+        return {
+            token: "",
+            user: null,
+        };
     }
 }
 
 function getUserId() {
-    const user = getSession();
-    return (user?.user_id || user?.id || user?.studentNumber || user?.email || "");
+    return getSession()?.user?.user_id || "";
 }
 
 function getToken() {
-    const session = getSession();
-    return (session?.token || session?.accessToken || localStorage.getItem("token") || "");
+    return getSession()?.token || "";
 }
 
 function RevisionHub() {
@@ -54,7 +45,7 @@ function RevisionHub() {
     const [mode, setMode] = useState(null);
     const [content, setContent] = useState(null);
     const [currentQuestion, setCurrentQuestion] = useState(0);
-    const [selectedAnswer, setSelectedAnswer] = useState(null);
+    const [selectedAnswer, setSelectedAnswer] = useState({});
     const [showAnswer, setShowAnswer] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -162,7 +153,7 @@ function RevisionHub() {
         setContent(null);
         setMode(type);
         setCurrentQuestion(0);
-        setSelectedAnswer(null);
+        setSelectedAnswer({});
         setShowAnswer(false);
 
         const endpoint =
@@ -172,6 +163,13 @@ function RevisionHub() {
 
         try {
             const token = getToken();
+
+            console.log("SESSION:", getSession());
+            console.log("USER ID:", getUserId());
+            console.log("TOKEN EXISTS:", !!getToken());
+            console.log("SELECTED DOCUMENT:", document);
+            console.log("DOCUMENT ID:", documentId);
+            console.log("MODULE ID:", moduleId);
 
             const requestBody = type === "quiz" ? {
                 userId: getUserId(),
@@ -276,7 +274,7 @@ function RevisionHub() {
                             setMode(null);
                             setError("");
                             setCurrentQuestion(0);
-                            setSelectedAnswer(null);
+                            setSelectedAnswer({});
                             setShowAnswer(false);
                         }}
                     >
@@ -323,7 +321,7 @@ function RevisionHub() {
                         {
                             loading && mode === "quiz"
                                 ? "Generating..."
-                                : "Generating Quiz"
+                                : "Generate Quiz"
                         }
                     </button>
 
@@ -390,13 +388,16 @@ function RevisionHub() {
                                                 type="button"
                                                 key={optionIndex}
                                                 className={
-                                                    selectedAnswer === optionIndex
+                                                    selectedAnswer[index] === optionIndex
                                                         ? "revision-hub-page__option revision-hub-page__option--selected"
                                                         : "revision-hub-page__option"
                                                 }
                                                 onClick={() => {
                                                     setCurrentQuestion(index);
-                                                    setSelectedAnswer(optionIndex);
+                                                    setSelectedAnswer((previous) => ({
+                                                        ...previous,
+                                                        [index]: optionIndex,
+                                                    }));
                                                 }}
                                             >
                                                 {value}

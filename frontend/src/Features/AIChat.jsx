@@ -5,49 +5,37 @@ const API_URL = "http://localhost:5000/api";
 
 function getSession() {
     try {
-        const rawToken = localStorage.getItem("token") || localStorage.getItem("accessToken");
-        if (rawToken) return { token: rawToken };
+        const raw = localStorage.getItem("studysphere_session");
 
-        const sessionStr = localStorage.getItem("studysphere_session") || localStorage.getItem("user");
-        if (!sessionStr) return null;
-
-        if (!sessionStr.startsWith("{") && !sessionStr.startsWith("[")) {
-            return { token: sessionStr };
+        if (!raw) {
+            return {
+                token: "",
+                user: null,
+            };
         }
 
-        const parsed = JSON.parse(sessionStr);
-        if (typeof parsed === 'string') {
-            return { token: parsed };
-        }
-        return parsed;
+        const session = JSON.parse(raw);
+
+        return {
+            token: session?.token || "",
+            user: session?.user || null,
+        };
     } catch (error) {
-        console.error("Error reading session:", error);
-        const rawToken = localStorage.getItem("token");
-        if (rawToken) return { token: rawToken };
-        return null;
+        console.error("Could not read stored session:", error);
+
+        return {
+            token: "",
+            user: null,
+        };
     }
 }
 
 function getUserId() {
-    const user = getSession();
-    return (
-        user?.user_id ||
-        user?.id ||
-        user?.studentNumber ||
-        user?.email ||
-        ""
-    );
-
+    return getSession()?.user?.user_id || "";
 }
 
 function getToken() {
-    const session = getSession();
-    return (
-        session?.token ||
-        session?.accessToken ||
-        localStorage.getItem("token") ||
-        ""
-    );
+    return getSession()?.token || "";
 }
 
 function AIChat({ initialDocument }) {
@@ -92,21 +80,30 @@ function AIChat({ initialDocument }) {
             setMessages([]);
             return;
         }
+
+        // Wait until the document list has loaded,
+        // unless the initial document already contains its module ID.
+        if (
+            documents.length === 0 &&
+            !initialDocument?.module_id &&
+            !initialDocument?.moduleId
+        ) {
+            return;
+        }
+
         initialiseSession();
-    }, [selectedDocuments]);
+    }, [selectedDocuments, documents, initialDocument]);
 
     async function loadDocuments() {
         try {
-            const userId = getUserId();
+
             const token = getToken();
-            const response = await fetch(
-                `${API_URL}/documents${userId ? `?userid=${encodeURIComponent(userId)}` : ""}`,
-                {
-                    headers: {
-                        Authorization: token ? `Bearer ${token}` : "",
-                    },
-                }
-            );
+            const response = await fetch(`${API_URL}/documents`, {
+
+                headers: {
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+            });
 
             if (!response.ok) {
                 throw new Error(`Could not load documents (${response.status})`);
@@ -154,6 +151,12 @@ function AIChat({ initialDocument }) {
         if (selectedDocuments.length === 0) {
             return null;
         }
+        console.log("AI CHAT SESSION:", getSession());
+        console.log("AI CHAT USER ID:", getUserId());
+        console.log("AI CHAT TOKEN EXISTS:", !!getToken());
+        console.log("AI CHAT SELECTED DOCUMENTS:", selectedDocuments);
+        console.log("AI CHAT INITIAL DOCUMENT:", initialDocument);
+
         const documentId = selectedDocuments[0];
 
         const selectedDocument = documents.find(
@@ -276,7 +279,7 @@ function AIChat({ initialDocument }) {
             let activeSessionId = sessionId;
 
             if (!activeSessionId) {
-                activeSessionId = await initialisingSession();
+                activeSessionId = await initialiseSession();
             }
 
             if (!activeSessionId) {
@@ -381,7 +384,7 @@ function AIChat({ initialDocument }) {
                 <div className="ai-chat-page__messages">
                     {messages.length === 0 && (
                         <div className="ai-chat-page__empty">
-                           {initialisingSession ? "Preparing your AI Study Session..." : "Ask a question to get started."}
+                            {initialisingSession ? "Preparing your AI Study Session..." : "Ask a question to get started."}
                         </div>
                     )}
 
@@ -439,7 +442,7 @@ function AIChat({ initialDocument }) {
                         placeholder="Ask a question..."
                         disabled={loading || initialisingSession}
                     />
-                    <button type="submit" disabled={loading ||initialisingSession || !question.trim() || selectedDocuments.length === 0}>
+                    <button type="submit" disabled={loading || initialisingSession || !question.trim() || selectedDocuments.length === 0}>
                         {loading ? "Sending..." : "Send"}
                     </button>
                 </form>
