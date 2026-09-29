@@ -2,12 +2,19 @@ const Flashcard = require('../models/flashcard.model');
 const aiService = require('../service/ai.service');
 const db = require('../../config/db');
 
+function getUserId(req) {
+  return req.user?.user_id || req.user?.id || Number(req.body.userId) || Number(req.query.userId) || null;
+}
+
 exports.generateFlashcards = async (req, res) => {
   try {
-    // TEMP: authentication disabled
-    const userId = req.body.userId || req.query.userId || 1;
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
 
-    const { documentId, moduleId, title, numberOfCards = 8 } = req.body;
+    const { documentId, moduleId, title } = req.body;
+    const numberOfCards = Math.min(Math.max(Number(req.body.numberOfCards) || 8, 1), 30);
 
     if (!documentId || !moduleId) {
       return res.status(400).json({
@@ -16,7 +23,6 @@ exports.generateFlashcards = async (req, res) => {
       });
     }
 
-    // 1. Fetch the document
     const [docs] = await db.execute(
       `SELECT document_id, title, file_path, openai_file_id
        FROM DOCUMENT
@@ -33,14 +39,17 @@ exports.generateFlashcards = async (req, res) => {
 
     const document = docs[0];
 
-    // 2. Get extracted text
-    //    Adjust this if your table/column is different
-    const [textRows] = await db.execute(
-      `SELECT extracted_text FROM document_text WHERE document_id = ?`,
-      [documentId]
-    );
-
-    let studyText = textRows[0]?.extracted_text || '';
+    let studyText = '';
+    try {
+      const [textRows] = await db.execute(
+        `SELECT extracted_text FROM DOCUMENT_TEXT WHERE document_id = ?`,
+        [documentId]
+      );
+      studyText = textRows[0]?.extracted_text || '';
+    } catch (e) {
+      console.error('Could not load document text:', e.message);
+      studyText = '';
+    }
 
     if (!studyText || studyText.trim().length < 50) {
       return res.status(400).json({
@@ -53,22 +62,17 @@ exports.generateFlashcards = async (req, res) => {
       studyText = studyText.substring(0, 12000) + '...';
     }
 
-    // 3. Call AI
     let aiResult;
     try {
       aiResult = await aiService.generateFlashcards(studyText, numberOfCards);
-   } catch (aiError) {
-    console.error('AI generation failed');
-    console.error('Message:', aiError.message);
-    console.error('Status:', aiError.status);
-    console.error('Response:', aiError.response?.data);
-
-    return res.status(502).json({
+    } catch (aiError) {
+      console.error('AI generation failed:', aiError.message);
+      return res.status(502).json({
         success: false,
         message: 'Failed to generate flashcards from AI service',
-        error: aiError.message
-    });
-}
+        error: aiError.message,
+      });
+    }
 
     if (!aiResult?.flashcards || !Array.isArray(aiResult.flashcards) || aiResult.flashcards.length === 0) {
       return res.status(500).json({
@@ -77,7 +81,6 @@ exports.generateFlashcards = async (req, res) => {
       });
     }
 
-    // 4. Save to database
     const setTitle = title || `Flashcards – ${document.title}`;
     const flashcardSetId = await Flashcard.createSetWithCards({
       userId,
@@ -105,15 +108,13 @@ exports.generateFlashcards = async (req, res) => {
 
 exports.getMyFlashcardSets = async (req, res) => {
   try {
-    const userId = req.query.userId || 1;
-    const { moduleId } = req.query;
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
 
-    const sets = await Flashcard.getSetsByUser(userId, moduleId || null);
-
-    return res.json({
-      success: true,
-      data: sets,
-    });
+    const sets = await Flashcard.getSetsByUser(userId, req.query.moduleId || null);
+    return res.json({ success: true, data: sets });
   } catch (error) {
     console.error('getMyFlashcardSets error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch flashcard sets' });
@@ -122,19 +123,17 @@ exports.getMyFlashcardSets = async (req, res) => {
 
 exports.getFlashcardSet = async (req, res) => {
   try {
-    const userId = req.query.userId || 1;
-    const setId = parseInt(req.params.id, 10);
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
 
-    const set = await Flashcard.getSetById(setId, userId);
-
+    const set = await Flashcard.getSetById(parseInt(req.params.id, 10), userId);
     if (!set) {
       return res.status(404).json({ success: false, message: 'Flashcard set not found' });
     }
 
-    return res.json({
-      success: true,
-      data: set,
-    });
+    return res.json({ success: true, data: set });
   } catch (error) {
     console.error('getFlashcardSet error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch flashcard set' });
@@ -143,19 +142,17 @@ exports.getFlashcardSet = async (req, res) => {
 
 exports.deleteFlashcardSet = async (req, res) => {
   try {
-    const userId = req.query.userId || req.body.userId || 1;
-    const setId = parseInt(req.params.id, 10);
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
 
-    const deleted = await Flashcard.deleteSet(setId, userId);
-
+    const deleted = await Flashcard.deleteSet(parseInt(req.params.id, 10), userId);
     if (!deleted) {
       return res.status(404).json({ success: false, message: 'Flashcard set not found' });
     }
 
-    return res.json({
-      success: true,
-      message: 'Flashcard set deleted successfully',
-    });
+    return res.json({ success: true, message: 'Flashcard set deleted successfully' });
   } catch (error) {
     console.error('deleteFlashcardSet error:', error);
     return res.status(500).json({ success: false, message: 'Failed to delete flashcard set' });

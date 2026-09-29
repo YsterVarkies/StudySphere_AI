@@ -1,113 +1,70 @@
 const Analytics = require('../models/analytics.model');
 
-/**
- * GET /api/analytics/overview
- */
+function getUserId(req) {
+  return req.user?.user_id || req.user?.id || Number(req.body.userId) || Number(req.query.userId) || null;
+}
+
 exports.getOverview = async (req, res) => {
   try {
     const data = await Analytics.getOverview();
     return res.json({ success: true, data });
   } catch (error) {
     console.error('getOverview error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch analytics overview',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-    });
+    return res.status(500).json({ success: false, message: 'Failed to fetch analytics overview' });
   }
 };
 
-/**
- * GET /api/analytics/modules
- */
 exports.getModuleEngagement = async (req, res) => {
   try {
     const data = await Analytics.getModuleEngagement();
     return res.json({ success: true, data });
   } catch (error) {
     console.error('getModuleEngagement error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch module engagement',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to fetch module engagement' });
   }
 };
 
-/**
- * GET /api/analytics/logs?limit=20
- */
 exports.getRecentLogs = async (req, res) => {
   try {
-    const limit = req.query.limit || 20;
-    const data = await Analytics.getRecentLogs(limit);
+    const data = await Analytics.getRecentLogs(req.query.limit || 20);
     return res.json({ success: true, data });
   } catch (error) {
     console.error('getRecentLogs error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch activity logs',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to fetch activity logs' });
   }
 };
 
-/**
- * GET /api/analytics/trend?days=7
- */
 exports.getActivityTrend = async (req, res) => {
   try {
-    const days = req.query.days || 7;
-    const data = await Analytics.getActivityTrend(days);
+    const data = await Analytics.getActivityTrend(req.query.days || 7);
     return res.json({ success: true, data });
   } catch (error) {
     console.error('getActivityTrend error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch activity trend',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to fetch activity trend' });
   }
 };
 
-/**
- * GET /api/analytics/top-users?limit=10
- */
 exports.getTopUsers = async (req, res) => {
   try {
-    const limit = req.query.limit || 10;
-    const data = await Analytics.getTopUsers(limit);
+    const data = await Analytics.getTopUsers(req.query.limit || 10);
     return res.json({ success: true, data });
   } catch (error) {
     console.error('getTopUsers error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to fetch top users',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to fetch top users' });
   }
 };
 
-/**
- * POST /api/analytics/log
- * Body: { userId?, activityType, relatedEntityType?, relatedEntityId?, description?, logLevel? }
- */
 exports.createLog = async (req, res) => {
   try {
-    const {
-      userId,
-      activityType,
-      relatedEntityType,
-      relatedEntityId,
-      description,
-      logLevel,
-    } = req.body;
+    const userId = getUserId(req);
+    const { activityType, relatedEntityType, relatedEntityId, description, logLevel } = req.body;
 
     if (!activityType) {
-      return res.status(400).json({
-        success: false,
-        message: 'activityType is required',
-      });
+      return res.status(400).json({ success: false, message: 'activityType is required' });
     }
 
     const id = await Analytics.logActivity({
-      userId: userId || null,
+      userId,
       activityType,
       relatedEntityType,
       relatedEntityId,
@@ -122,17 +79,10 @@ exports.createLog = async (req, res) => {
     });
   } catch (error) {
     console.error('createLog error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to log activity',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to log activity' });
   }
 };
 
-/**
- * GET /api/analytics
- * Combined dashboard payload (matches your admin frontend shape)
- */
 exports.getDashboard = async (req, res) => {
   try {
     const overview = await Analytics.getOverview();
@@ -140,7 +90,6 @@ exports.getDashboard = async (req, res) => {
     const recentLogs = await Analytics.getRecentLogs(5);
     const trend = await Analytics.getActivityTrend(7);
 
-    // Shape similar to your existing /api/analytics response
     const activeModules = modules.slice(0, 4).map((m, index) => {
       const score =
         (m.documents || 0) * 2 +
@@ -174,7 +123,6 @@ exports.getDashboard = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch dashboard analytics',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
