@@ -10,6 +10,75 @@ const genAI = new GoogleGenerativeAI(
 const MODEL_NAME = 'gemini-3.8-flash';
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
+function normalizeDifficulty(difficulty) {
+  const value = String(difficulty || 'medium')
+    .trim()
+    .toLowerCase();
+
+  if (!['easy', 'medium', 'hard'].includes(value)) {
+    return 'medium';
+  }
+
+  return value;
+}
+
+function getDifficultyInstructions(difficulty) {
+  if (difficulty === 'easy') {
+    return `
+DIFFICULTY: EASY
+COGNITIVE LEVEL: RECALL
+
+Create questions or flashcards that test direct recall of information.
+
+Focus on:
+- Definitions
+- Facts
+- Terminology
+- Identifying concepts
+- Remembering key information
+
+Do not require complex reasoning, application, comparison, or analysis.
+`;
+  }
+
+  if (difficulty === 'hard') {
+    return `
+DIFFICULTY: HARD
+COGNITIVE LEVEL: ANALYSE
+
+Create questions or flashcards that require the student to analyse information.
+
+Focus on:
+- Comparing concepts
+- Distinguishing between related concepts
+- Analysing relationships
+- Interpreting information
+- Multi-step reasoning
+- Determining causes and effects
+- Analysing scenarios using multiple pieces of information
+
+Do not make the content difficult simply by using complicated wording.
+The difficulty must come from the level of analysis required.
+`;
+  }
+
+  return `
+DIFFICULTY: MEDIUM
+COGNITIVE LEVEL: APPLY
+
+Create questions or flashcards that require the student to apply information from the study material.
+
+Focus on:
+- Applying concepts to situations
+- Using rules or principles
+- Solving problems using the study material
+- Applying knowledge to examples
+- Interpreting information using concepts from the study material
+
+Do not rely only on direct recall.
+`;
+}
+
 async function extractDocumentContent(
   fileBuffer,
   mimeType,
@@ -173,7 +242,8 @@ ${question}
 async function generateQuiz(
   documentContent,
   fileName,
-  numberOfQuestions = 5
+  numberOfQuestions = 5,
+  difficulty = 'medium'
 ) {
   const requestedNumber = Math.min(
     Math.max(
@@ -183,16 +253,24 @@ async function generateQuiz(
     20
   );
 
+  const normalizedDifficulty =
+    normalizeDifficulty(difficulty);
+
+  const difficultyInstructions =
+    getDifficultyInstructions(
+      normalizedDifficulty
+    );
+
   const prompt = `
 You are creating a multiple-choice quiz for a university student.
 
 Read the study material carefully.
 
+${difficultyInstructions}
+
 Create EXACTLY ${requestedNumber} questions.
 
 Every question MUST be based ONLY on the supplied study material.
-
-Focus on important concepts, definitions, facts, processes, examples, and relationships found in the study material.
 
 Do not invent information.
 
@@ -211,10 +289,10 @@ Use EXACTLY this structure:
     {
       "question": "What is ...?",
       "options": [
-        "A",
-        "B",
-        "C",
-        "D"
+        "Option A",
+        "Option B",
+        "Option C",
+        "Option D"
       ],
       "correct_answer": "A",
       "explanation": "..."
@@ -229,6 +307,10 @@ IMPORTANT:
 - Do not use empty question text.
 - Do not use empty options.
 - Return exactly ${requestedNumber} questions.
+- Easy means RECALL.
+- Medium means APPLY.
+- Hard means ANALYSE.
+- The difficulty must come from the cognitive level, not complicated wording.
 
 Document:
 ${fileName}
@@ -381,7 +463,8 @@ ${fileName}
 async function generateFlashcards(
   documentContent,
   fileName,
-  numberOfCards = 5
+  numberOfCards = 5,
+  difficulty = 'medium'
 ) {
   const requestedNumber = Math.min(
     Math.max(
@@ -391,12 +474,26 @@ async function generateFlashcards(
     20
   );
 
+  const normalizedDifficulty =
+    normalizeDifficulty(difficulty);
+
+  const difficultyInstructions =
+    getDifficultyInstructions(
+      normalizedDifficulty
+    );
+
   const prompt = `
 You are creating study flashcards for a university student.
 
 Read the study material carefully.
 
+${difficultyInstructions}
+
 Create EXACTLY ${requestedNumber} flashcards based ONLY on the study material.
+
+The front of each flashcard should test the student according to the selected cognitive level.
+
+The back of each flashcard should provide the correct answer or explanation based only on the study material.
 
 Return ONLY valid JSON using this exact structure:
 
@@ -409,7 +506,16 @@ Return ONLY valid JSON using this exact structure:
   ]
 }
 
-Do not invent information.
+IMPORTANT:
+- Do not invent information.
+- Do not return markdown.
+- Do not use code fences.
+- Do not add text before or after the JSON.
+- Return exactly ${requestedNumber} flashcards.
+- Easy means RECALL.
+- Medium means APPLY.
+- Hard means ANALYSE.
+- The difficulty must come from the cognitive level, not complicated wording.
 
 Document:
 ${fileName}
@@ -474,19 +580,47 @@ ${fileName}
     );
   }
 
+  if (
+    parsed.flashcards.length !==
+    requestedNumber
+  ) {
+    throw new Error(
+      `Gemini returned ${parsed.flashcards.length} flashcards instead of ${requestedNumber}`
+    );
+  }
+
   return {
-    flashcards: parsed.flashcards.map(
-      (card) => ({
-        front:
-          card.front ||
-          card.question ||
-          '',
-        back:
-          card.back ||
-          card.answer ||
-          ''
-      })
-    )
+    flashcards:
+      parsed.flashcards.map(
+        (card, index) => {
+          const front =
+            card.front ||
+            card.question ||
+            '';
+
+          const back =
+            card.back ||
+            card.answer ||
+            '';
+
+          if (!String(front).trim()) {
+            throw new Error(
+              `Flashcard ${index + 1} has no front content`
+            );
+          }
+
+          if (!String(back).trim()) {
+            throw new Error(
+              `Flashcard ${index + 1} has no back content`
+            );
+          }
+
+          return {
+            front: String(front).trim(),
+            back: String(back).trim()
+          };
+        }
+      )
   };
 }
 

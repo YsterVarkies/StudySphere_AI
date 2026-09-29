@@ -109,6 +109,20 @@ exports.generateFlashcards = async (req, res) => {
       30
     );
 
+    const difficulty = String(
+      req.body.difficulty || 'medium'
+    )
+      .trim()
+      .toLowerCase();
+
+    if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'difficulty must be easy, medium, or hard'
+      });
+    }
+
     if (!documentId || !moduleId) {
       return res.status(400).json({
         success: false,
@@ -183,7 +197,8 @@ exports.generateFlashcards = async (req, res) => {
         await aiService.generateFlashcards(
           documentContent,
           document.title,
-          numberOfCards
+          numberOfCards,
+          difficulty
         );
     } catch (aiError) {
       console.error(

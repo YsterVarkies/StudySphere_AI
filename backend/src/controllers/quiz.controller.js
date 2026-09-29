@@ -102,6 +102,19 @@ exports.generateQuiz = async (req, res) => {
 
     const title = req.body.title;
 
+    const difficulty = String(
+      req.body.difficulty || 'medium'
+    )
+      .trim()
+      .toLowerCase();
+
+    if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+      return res.status(400).json({
+        success: false,
+        message: 'difficulty must be easy, medium, or hard'
+      });
+    }
+
     if (!documentId || !moduleId) {
       return res.status(400).json({
         success: false,
@@ -170,7 +183,8 @@ exports.generateQuiz = async (req, res) => {
       aiResult = await aiService.generateQuiz(
         documentContent,
         document.title,
-        numberOfQuestions
+        numberOfQuestions,
+        difficulty
       );
     } catch (error) {
       console.error(
@@ -228,18 +242,26 @@ exports.generateQuiz = async (req, res) => {
       }
     );
 
-    for (let i = 0; i < normalizedQuestions.length; i++) {
+    for (
+      let i = 0;
+      i < normalizedQuestions.length;
+      i++
+    ) {
       if (!normalizedQuestions[i].question.trim()) {
         return res.status(500).json({
           success: false,
-          message: `AI returned an empty question at position ${i + 1}`
+          message:
+            `AI returned an empty question at position ${i + 1}`
         });
       }
 
-      if (normalizedQuestions[i].options.length === 0) {
+      if (
+        normalizedQuestions[i].options.length === 0
+      ) {
         return res.status(500).json({
           success: false,
-          message: `AI returned no options for question ${i + 1}`
+          message:
+            `AI returned no options for question ${i + 1}`
         });
       }
     }
@@ -446,7 +468,9 @@ exports.submitAttempt = async (req, res) => {
       if (
         userAnswer &&
         String(userAnswer).trim().toUpperCase() ===
-          String(question.correct_answer).trim().toUpperCase()
+          String(question.correct_answer)
+            .trim()
+            .toUpperCase()
       ) {
         correct++;
       }
