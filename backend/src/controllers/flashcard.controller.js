@@ -1,107 +1,251 @@
 const Flashcard = require('../models/flashcard.model');
 const aiService = require('../service/ai.service');
 const db = require('../../config/db');
+const storage = require('../../config/storage');
+const { GetObjectCommand } = require('@aws-sdk/client-s3');
+
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 function getUserId(req) {
-  return req.user?.user_id || req.user?.id || Number(req.body.userId) || Number(req.query.userId) || null;
+  return req.user?.user_id ||
+    req.user?.id ||
+    Number(req.body.userId) ||
+    Number(req.query.userId) ||
+    null;
+}
+
+async function streamToBuffer(stream) {
+  const chunks = [];
+
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+
+  return Buffer.concat(chunks);
+}
+
+async function getDocumentFile(
+  documentId,
+  userId,
+  moduleId
+) {
+  const [rows] = await db.execute(
+    `SELECT document_id, title, file_path, file_type, file_size
+     FROM DOCUMENT
+     WHERE document_id = ?
+     AND user_id = ?
+     AND module_id = ?`,
+    [documentId, userId, moduleId]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const document = rows[0];
+
+  if (!document.file_path) {
+    throw new Error(
+      'Document does not have a stored file'
+    );
+  }
+
+  if (document.file_size > MAX_FILE_SIZE) {
+    throw new Error(
+      'Document exceeds the 25 MB limit'
+    );
+  }
+
+  const result = await storage.send(
+    new GetObjectCommand({
+      Bucket: process.env.B2_BUCKET_NAME,
+      Key: document.file_path
+    })
+  );
+
+  if (!result.Body) {
+    throw new Error(
+      'Could not retrieve document from storage'
+    );
+  }
+
+  const fileBuffer =
+    await streamToBuffer(result.Body);
+
+  if (fileBuffer.length > MAX_FILE_SIZE) {
+    throw new Error(
+      'Document exceeds the 25 MB limit'
+    );
+  }
+
+  return {
+    document,
+    fileBuffer
+  };
 }
 
 exports.generateFlashcards = async (req, res) => {
   try {
     const userId = getUserId(req);
+
     if (!userId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
     }
 
-    const { documentId, moduleId, title } = req.body;
-    const numberOfCards = Math.min(Math.max(Number(req.body.numberOfCards) || 8, 1), 30);
+    const {
+      documentId,
+      moduleId,
+      title
+    } = req.body;
+
+    const numberOfCards = Math.min(
+      Math.max(
+        Number(req.body.numberOfCards) || 8,
+        1
+      ),
+      30
+    );
 
     if (!documentId || !moduleId) {
       return res.status(400).json({
         success: false,
-        message: 'documentId and moduleId are required',
+        message:
+          'documentId and moduleId are required'
       });
     }
 
-    const [docs] = await db.execute(
-      `SELECT document_id, title, file_path, openai_file_id
-       FROM DOCUMENT
-       WHERE document_id = ? AND user_id = ? AND module_id = ?`,
-      [documentId, userId, moduleId]
-    );
+    let documentData;
 
-    if (docs.length === 0) {
+    try {
+      documentData =
+        await getDocumentFile(
+          documentId,
+          userId,
+          moduleId
+        );
+    } catch (documentError) {
+      console.error(
+        'Document retrieval failed:',
+        documentError.message
+      );
+
+      return res.status(502).json({
+        success: false,
+        message:
+          'Failed to retrieve selected document',
+        error: documentError.message
+      });
+    }
+
+    if (!documentData) {
       return res.status(404).json({
         success: false,
-        message: 'Document not found or access denied',
+        message:
+          'Document not found or access denied'
       });
     }
 
-    const document = docs[0];
+    const {
+      document,
+      fileBuffer
+    } = documentData;
 
-    let studyText = '';
+    let documentContent;
+
     try {
-      const [textRows] = await db.execute(
-        `SELECT extracted_text FROM DOCUMENT_TEXT WHERE document_id = ?`,
-        [documentId]
+      documentContent =
+        await aiService.extractDocumentContent(
+          fileBuffer,
+          document.file_type,
+          document.title
+        );
+    } catch (error) {
+      console.error(
+        'Document processing failed:',
+        error.message
       );
-      studyText = textRows[0]?.extracted_text || '';
-    } catch (e) {
-      console.error('Could not load document text:', e.message);
-      studyText = '';
-    }
 
-    if (!studyText || studyText.trim().length < 50) {
       return res.status(400).json({
         success: false,
-        message: 'Not enough text content available for this document to generate flashcards',
+        message:
+          'Failed to process document',
+        error: error.message
       });
-    }
-
-    if (studyText.length > 12000) {
-      studyText = studyText.substring(0, 12000) + '...';
     }
 
     let aiResult;
+
     try {
-      aiResult = await aiService.generateFlashcards(studyText, numberOfCards);
+      aiResult =
+        await aiService.generateFlashcards(
+          documentContent,
+          document.title,
+          numberOfCards
+        );
     } catch (aiError) {
-      console.error('AI generation failed:', aiError.message);
+      console.error(
+        'AI generation failed:',
+        aiError.message
+      );
+
       return res.status(502).json({
         success: false,
-        message: 'Failed to generate flashcards from AI service',
-        error: aiError.message,
+        message:
+          'Failed to generate flashcards from AI service',
+        error: aiError.message
       });
     }
 
-    if (!aiResult?.flashcards || !Array.isArray(aiResult.flashcards) || aiResult.flashcards.length === 0) {
+    if (
+      !aiResult?.flashcards ||
+      !Array.isArray(aiResult.flashcards) ||
+      aiResult.flashcards.length === 0
+    ) {
       return res.status(500).json({
         success: false,
-        message: 'AI returned invalid flashcard format',
+        message:
+          'AI returned invalid flashcard format'
       });
     }
 
-    const setTitle = title || `Flashcards – ${document.title}`;
-    const flashcardSetId = await Flashcard.createSetWithCards({
-      userId,
-      moduleId,
-      documentId,
-      title: setTitle,
-      cards: aiResult.flashcards,
-    });
+    const setTitle =
+      title ||
+      `Flashcards – ${document.title}`;
 
-    const fullSet = await Flashcard.getSetById(flashcardSetId, userId);
+    const flashcardSetId =
+      await Flashcard.createSetWithCards({
+        userId,
+        moduleId,
+        documentId,
+        title: setTitle,
+        cards: aiResult.flashcards
+      });
+
+    const fullSet =
+      await Flashcard.getSetById(
+        flashcardSetId,
+        userId
+      );
 
     return res.status(201).json({
       success: true,
-      message: 'Flashcards generated successfully',
-      data: fullSet,
+      message:
+        'Flashcards generated successfully',
+      data: fullSet
     });
   } catch (error) {
-    console.error('generateFlashcards error:', error);
+    console.error(
+      'generateFlashcards error:',
+      error
+    );
+
     return res.status(500).json({
       success: false,
-      message: 'Internal server error while generating flashcards',
+      message:
+        'Internal server error while generating flashcards'
     });
   }
 };
@@ -109,52 +253,121 @@ exports.generateFlashcards = async (req, res) => {
 exports.getMyFlashcardSets = async (req, res) => {
   try {
     const userId = getUserId(req);
+
     if (!userId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
     }
 
-    const sets = await Flashcard.getSetsByUser(userId, req.query.moduleId || null);
-    return res.json({ success: true, data: sets });
+    const sets =
+      await Flashcard.getSetsByUser(
+        userId,
+        req.query.moduleId || null
+      );
+
+    return res.json({
+      success: true,
+      data: sets
+    });
   } catch (error) {
-    console.error('getMyFlashcardSets error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to fetch flashcard sets' });
+    console.error(
+      'getMyFlashcardSets error:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        'Failed to fetch flashcard sets'
+    });
   }
 };
 
 exports.getFlashcardSet = async (req, res) => {
   try {
     const userId = getUserId(req);
+
     if (!userId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
     }
 
-    const set = await Flashcard.getSetById(parseInt(req.params.id, 10), userId);
+    const set =
+      await Flashcard.getSetById(
+        parseInt(req.params.id, 10),
+        userId
+      );
+
     if (!set) {
-      return res.status(404).json({ success: false, message: 'Flashcard set not found' });
+      return res.status(404).json({
+        success: false,
+        message:
+          'Flashcard set not found'
+      });
     }
 
-    return res.json({ success: true, data: set });
+    return res.json({
+      success: true,
+      data: set
+    });
   } catch (error) {
-    console.error('getFlashcardSet error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to fetch flashcard set' });
+    console.error(
+      'getFlashcardSet error:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        'Failed to fetch flashcard set'
+    });
   }
 };
 
 exports.deleteFlashcardSet = async (req, res) => {
   try {
     const userId = getUserId(req);
+
     if (!userId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
     }
 
-    const deleted = await Flashcard.deleteSet(parseInt(req.params.id, 10), userId);
+    const deleted =
+      await Flashcard.deleteSet(
+        parseInt(req.params.id, 10),
+        userId
+      );
+
     if (!deleted) {
-      return res.status(404).json({ success: false, message: 'Flashcard set not found' });
+      return res.status(404).json({
+        success: false,
+        message:
+          'Flashcard set not found'
+      });
     }
 
-    return res.json({ success: true, message: 'Flashcard set deleted successfully' });
+    return res.json({
+      success: true,
+      message:
+        'Flashcard set deleted successfully'
+    });
   } catch (error) {
-    console.error('deleteFlashcardSet error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to delete flashcard set' });
+    console.error(
+      'deleteFlashcardSet error:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        'Failed to delete flashcard set'
+    });
   }
 };
