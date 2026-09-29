@@ -309,3 +309,160 @@
   background: #dcfce7;
   color: #166534;
 }
+
+/* =========================
+   Responsive Design
+   ========================= */
+
+/* Tablet */
+@media (max-width: 900px) {
+  .study-materials-page {
+    padding: 28px 24px;
+  }
+
+  .study-materials-page__header h1 {
+    font-size: 30px;
+  }
+
+  .study-materials-page__header p {
+    font-size: 16px;
+  }
+
+  .study-materials-page__documents {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .study-materials-page__controls {
+    flex-wrap: wrap;
+  }
+
+  .study-materials-page__controls select {
+    min-width: 140px;
+  }
+
+  .study-materials-page__search-wrapper {
+    min-width: 220px;
+  }
+}
+
+
+/* Mobile */
+@media (max-width: 600px) {
+  .study-materials-page {
+    padding: 20px 16px;
+  }
+
+  .study-materials-page__header {
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .study-materials-page__header h1 {
+    font-size: 26px;
+  }
+
+  .study-materials-page__header p {
+    margin-top: 8px;
+    font-size: 15px;
+  }
+
+  .study-materials-page__upload-top-btn {
+    width: 100%;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .study-materials-page__controls {
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .study-materials-page__controls select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .study-materials-page__search-wrapper {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .study-materials-page__documents {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .study-materials-page__document {
+    padding: 16px;
+  }
+
+  .study-materials-page__document-header-row {
+    gap: 10px;
+  }
+
+  .study-materials-page__document-info h3 {
+    font-size: 14px;
+  }
+
+  .study-materials-page__document-info p {
+    font-size: 12px;
+  }
+
+  .study-materials-page__document-actions {
+    flex-direction: column;
+  }
+
+  .study-materials-page__document-actions button {
+    width: 100%;
+  }
+
+  .study-materials-page__dropzone-card {
+    padding: 24px 16px;
+    min-height: 120px;
+  }
+
+  .study-materials-page__modal {
+    width: calc(100% - 32px);
+    max-width: none;
+    box-sizing: border-box;
+    padding: 20px;
+  }
+
+  .study-materials-page__modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .study-materials-page__btn-cancel,
+  .study-materials-page__btn-confirm {
+    width: 100%;
+    padding: 10px 16px;
+  }
+}
+
+
+/* Very small phones */
+@media (max-width: 400px) {
+  .study-materials-page {
+    padding: 16px 12px;
+  }
+
+  .study-materials-page__header h1 {
+    font-size: 23px;
+  }
+
+  .study-materials-page__header p {
+    font-size: 14px;
+  }
+
+  .study-materials-page__document {
+    padding: 14px;
+  }
+
+  .study-materials-page__document-actions {
+    gap: 6px;
+  }
+}
