@@ -70,9 +70,6 @@ export default function AnalyticsDashboard() {
         <div className="metric-value" style={{ fontSize: '1.875rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
           {stats.activeUsers}
         </div>
-        <p style={{ color: '#16a34a', fontSize: '0.8rem', fontWeight: 500, marginTop: '4px' }}>
-          {stats.userGrowth || "+0%"} vs last week
-        </p>
       </div>
         <div className="metric-card panel" style={{ background: '#fff', padding: '20px', borderRadius: '8px' }}>
           <h3 style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '8px' }}>Modules live</h3>

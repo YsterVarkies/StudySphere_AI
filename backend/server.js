@@ -72,7 +72,6 @@ app.use("/api/chat", aiChatRoutes);
 
 
 // AMIN - ANALYTICS
-const userGrowth = "+12%";
 
 app.get("/api/analytics", async (req, res) => {
     try {
@@ -81,28 +80,6 @@ app.get("/api/analytics", async (req, res) => {
         );
 
         const activeUsers = userCountResult[0].count;
-
-        let userGrowth = "+0%";
-        try {
-            const [thisWeekResult] = await db.query(
-                "SELECT COUNT(*) as count FROM USER WHERE created_at >= NOW() - INTERVAL 7 DAY"
-            );
-            const [lastWeekResult] = await db.query(
-                "SELECT COUNT(*) as count FROM USER WHERE created_at >= NOW() - INTERVAL 14 DAY AND created_at < NOW() - INTERVAL 7 DAY"
-            );
-            
-            const thisWeekCount = thisWeekResult[0]?.count || 0;
-            const lastWeekCount = lastWeekResult[0]?.count || 0;
-
-            if (lastWeekCount > 0) {
-                const growthRate = Math.round(((thisWeekCount - lastWeekCount) / lastWeekCount) * 100);
-                userGrowth = (growthRate >= 0 ? `+${growthRate}%` : `${growthRate}%`);
-            } else if (thisWeekCount > 0) {
-                userGrowth = "+100%";
-            }
-        } catch (calcErr) {
-            console.log("Could not calculate dynamic growth, defaulting to +0%", calcErr.message);
-        }
 
         const [moduleCountResult] = await db.query(
             "SELECT COUNT(*) as count FROM MODULE"
@@ -164,7 +141,6 @@ app.get("/api/analytics", async (req, res) => {
 
         res.json({
             activeUsers,
-            userGrowth,
             modulesLive,
             aiRequestsToday,
             systemErrors: 0,
