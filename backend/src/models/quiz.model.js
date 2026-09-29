@@ -68,10 +68,7 @@ const Quiz = {
       options: typeof q.options_json === 'string' ? JSON.parse(q.options_json) : q.options_json,
     }));
 
-    return {
-      ...quizzes[0],
-      questions: parsedQuestions,
-    };
+    return { ...quizzes[0], questions: parsedQuestions };
   },
 
   async getByUser(userId, moduleId = null) {

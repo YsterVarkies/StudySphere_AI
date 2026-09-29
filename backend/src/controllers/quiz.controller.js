@@ -2,14 +2,19 @@ const Quiz = require('../models/quiz.model');
 const aiService = require('../service/ai.service');
 const db = require('../../config/db');
 
-/**
- * POST /api/quizzes/generate
- * Body: { documentId, moduleId, userId?, numberOfQuestions?, title? }
- */
+function getUserId(req) {
+  return req.user?.user_id || req.user?.id || Number(req.body.userId) || Number(req.query.userId) || null;
+}
+
 exports.generateQuiz = async (req, res) => {
   try {
-    const userId = req.body.userId || req.query.userId || 1;
-    const { documentId, moduleId, title, numberOfQuestions = 5 } = req.body;
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const { documentId, moduleId, title } = req.body;
+    const numberOfQuestions = Math.min(Math.max(Number(req.body.numberOfQuestions) || 5, 1), 20);
 
     if (!documentId || !moduleId) {
       return res.status(400).json({
@@ -36,11 +41,12 @@ exports.generateQuiz = async (req, res) => {
     let studyText = '';
     try {
       const [textRows] = await db.execute(
-        `SELECT extracted_text FROM document_text WHERE document_id = ?`,
+        `SELECT extracted_text FROM DOCUMENT_TEXT WHERE document_id = ?`,
         [documentId]
       );
       studyText = textRows[0]?.extracted_text || '';
     } catch (e) {
+      console.error('Could not load document text:', e.message);
       studyText = '';
     }
 
@@ -59,11 +65,11 @@ exports.generateQuiz = async (req, res) => {
     try {
       aiResult = await aiService.generateQuiz(studyText, numberOfQuestions);
     } catch (aiError) {
-      console.error('AI quiz failed:', aiError);
+      console.error('AI quiz failed:', aiError.message);
       return res.status(502).json({
         success: false,
         message: 'Failed to generate quiz from AI service',
-        error: process.env.NODE_ENV === 'development' ? aiError.message : undefined,
+        error: aiError.message,
       });
     }
 
@@ -99,81 +105,66 @@ exports.generateQuiz = async (req, res) => {
   }
 };
 
-/**
- * GET /api/quizzes?userId=1&moduleId=1
- */
 exports.getQuizzes = async (req, res) => {
   try {
-    const userId = req.query.userId || 1;
-    const { moduleId } = req.query;
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
 
-    const quizzes = await Quiz.getByUser(userId, moduleId || null);
-
-    return res.json({
-      success: true,
-      data: quizzes,
-    });
+    const quizzes = await Quiz.getByUser(userId, req.query.moduleId || null);
+    return res.json({ success: true, data: quizzes });
   } catch (error) {
     console.error('getQuizzes error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch quizzes' });
   }
 };
 
-/**
- * GET /api/quizzes/:id?userId=1
- */
 exports.getQuizById = async (req, res) => {
   try {
-    const userId = req.query.userId || 1;
-    const quizId = parseInt(req.params.id, 10);
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
 
-    const quiz = await Quiz.getById(quizId, userId);
-
+    const quiz = await Quiz.getById(parseInt(req.params.id, 10), userId);
     if (!quiz) {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    return res.json({
-      success: true,
-      data: quiz,
-    });
+    return res.json({ success: true, data: quiz });
   } catch (error) {
     console.error('getQuizById error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch quiz' });
   }
 };
 
-/**
- * DELETE /api/quizzes/:id?userId=1
- */
 exports.deleteQuiz = async (req, res) => {
   try {
-    const userId = req.query.userId || req.body.userId || 1;
-    const quizId = parseInt(req.params.id, 10);
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
 
-    const deleted = await Quiz.delete(quizId, userId);
-
+    const deleted = await Quiz.delete(parseInt(req.params.id, 10), userId);
     if (!deleted) {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    return res.json({
-      success: true,
-      message: 'Quiz deleted successfully',
-    });
+    return res.json({ success: true, message: 'Quiz deleted successfully' });
   } catch (error) {
     console.error('deleteQuiz error:', error);
     return res.status(500).json({ success: false, message: 'Failed to delete quiz' });
   }
 };
 
-/**
- * POST /api/quizzes/:id/attempt
- * Body: { userId?, answers: { "1": "A", "2": "B" } }
- */
 exports.submitAttempt = async (req, res) => {
   try {
-    const userId = req.body.userId || req.query.userId || 1;
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
     const quizId = parseInt(req.params.id, 10);
     const { answers } = req.body;
 
@@ -193,23 +184,12 @@ exports.submitAttempt = async (req, res) => {
     });
 
     const score = total > 0 ? Number(((correct / total) * 100).toFixed(2)) : 0;
-
-    const attemptId = await Quiz.saveAttempt({
-      quizId,
-      userId,
-      answers,
-      score,
-    });
+    const attemptId = await Quiz.saveAttempt({ quizId, userId, answers, score });
 
     return res.status(201).json({
       success: true,
       message: 'Attempt submitted',
-      data: {
-        attemptId,
-        score,
-        correct,
-        total,
-      },
+      data: { attemptId, score, correct, total },
     });
   } catch (error) {
     console.error('submitAttempt error:', error);
@@ -217,20 +197,15 @@ exports.submitAttempt = async (req, res) => {
   }
 };
 
-/**
- * GET /api/quizzes/:id/attempts?userId=1
- */
 exports.getAttempts = async (req, res) => {
   try {
-    const userId = req.query.userId || 1;
-    const quizId = parseInt(req.params.id, 10);
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
 
-    const attempts = await Quiz.getAttempts(quizId, userId);
-
-    return res.json({
-      success: true,
-      data: attempts,
-    });
+    const attempts = await Quiz.getAttempts(parseInt(req.params.id, 10), userId);
+    return res.json({ success: true, data: attempts });
   } catch (error) {
     console.error('getAttempts error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch attempts' });

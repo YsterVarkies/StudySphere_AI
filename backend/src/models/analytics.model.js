@@ -1,9 +1,6 @@
 const db = require('../../config/db');
 
 const Analytics = {
-  /**
-   * Log a user/system activity
-   */
   async logActivity({
     userId,
     activityType,
@@ -13,7 +10,7 @@ const Analytics = {
     logLevel = 'info',
   }) {
     const [result] = await db.execute(
-      `INSERT INTO user_activity_log
+      `INSERT INTO USER_ACTIVITY_LOG
        (user_id, activity_type, related_entity_type, related_entity_id, description, log_level, created_at)
        VALUES (?, ?, ?, ?, ?, ?, NOW())`,
       [userId || null, activityType, relatedEntityType, relatedEntityId, description, logLevel]
@@ -21,9 +18,6 @@ const Analytics = {
     return result.insertId;
   },
 
-  /**
-   * Dashboard overview stats
-   */
   async getOverview() {
     const [users] = await db.execute(
       `SELECT COUNT(*) AS total_users,
@@ -31,42 +25,20 @@ const Analytics = {
        FROM USER`
     );
 
-    const [modules] = await db.execute(
-      `SELECT COUNT(*) AS total_modules FROM MODULE`
-    );
+    const [modules] = await db.execute(`SELECT COUNT(*) AS total_modules FROM MODULE`);
+    const [documents] = await db.execute(`SELECT COUNT(*) AS total_documents FROM DOCUMENT`);
+    const [quizzes] = await db.execute(`SELECT COUNT(*) AS total_quizzes FROM QUIZ`);
+    const [flashcards] = await db.execute(`SELECT COUNT(*) AS total_flashcard_sets FROM FLASHCARD_SET`);
+    const [summaries] = await db.execute(`SELECT COUNT(*) AS total_summaries FROM SUMMARY`);
+    const [chatSessions] = await db.execute(`SELECT COUNT(*) AS total_chat_sessions FROM CHAT_SESSION`);
+    const [announcements] = await db.execute(`SELECT COUNT(*) AS total_announcements FROM ANNOUNCEMENT`);
 
-    const [documents] = await db.execute(
-      `SELECT COUNT(*) AS total_documents FROM DOCUMENT`
-    );
-
-    const [quizzes] = await db.execute(
-      `SELECT COUNT(*) AS total_quizzes FROM QUIZ`
-    );
-
-    const [flashcards] = await db.execute(
-      `SELECT COUNT(*) AS total_flashcard_sets FROM FLASHCARD_SET`
-    );
-
-    const [summaries] = await db.execute(
-      `SELECT COUNT(*) AS total_summaries FROM SUMMARY`
-    );
-
-    const [chatSessions] = await db.execute(
-      `SELECT COUNT(*) AS total_chat_sessions FROM CHAT_SESSION`
-    );
-
-    const [announcements] = await db.execute(
-      `SELECT COUNT(*) AS total_announcements FROM ANNOUNCEMENT`
-    );
-
-    // Activity last 24 hours
     const [recentActivity] = await db.execute(
       `SELECT COUNT(*) AS activity_last_24h
        FROM USER_ACTIVITY_LOG
        WHERE created_at >= NOW() - INTERVAL 1 DAY`
     );
 
-    // Errors last 24 hours
     const [errors] = await db.execute(
       `SELECT COUNT(*) AS errors_last_24h
        FROM USER_ACTIVITY_LOG
@@ -89,13 +61,9 @@ const Analytics = {
     };
   },
 
-  /**
-   * Engagement by module
-   */
   async getModuleEngagement() {
     const [rows] = await db.execute(
-      `
-      SELECT
+      `SELECT
         m.module_id,
         m.module_code,
         m.module_name,
@@ -105,79 +73,51 @@ const Analytics = {
         (SELECT COUNT(*) FROM CHAT_SESSION cs WHERE cs.module_id = m.module_id) AS chat_sessions,
         (SELECT COUNT(*) FROM ANNOUNCEMENT a WHERE a.module_id = m.module_id) AS announcements
       FROM MODULE m
-      ORDER BY documents DESC, quizzes DESC
-      `
+      ORDER BY documents DESC, quizzes DESC`
     );
     return rows;
   },
 
-  /**
-   * Recent activity logs
-   */
   async getRecentLogs(limit = 20) {
     const [rows] = await db.execute(
-      `
-      SELECT
-        l.activity_id,
-        l.user_id,
-        l.activity_type,
-        l.related_entity_type,
-        l.related_entity_id,
-        l.description,
-        l.log_level,
-        l.created_at,
-        u.first_name,
-        u.last_name,
-        u.email
+      `SELECT
+        l.activity_id, l.user_id, l.activity_type, l.related_entity_type,
+        l.related_entity_id, l.description, l.log_level, l.created_at,
+        u.first_name, u.last_name, u.email
       FROM USER_ACTIVITY_LOG l
       LEFT JOIN USER u ON l.user_id = u.user_id
       ORDER BY l.created_at DESC
-      LIMIT ?
-      `,
+      LIMIT ?`,
       [Number(limit)]
     );
     return rows;
   },
 
-  /**
-   * Activity over the last N days (for charts)
-   */
   async getActivityTrend(days = 7) {
     const [rows] = await db.execute(
-      `
-      SELECT
+      `SELECT
         DATE(created_at) AS day,
         COUNT(*) AS total,
         SUM(CASE WHEN log_level = 'error' THEN 1 ELSE 0 END) AS errors
       FROM USER_ACTIVITY_LOG
       WHERE created_at >= NOW() - INTERVAL ? DAY
       GROUP BY DATE(created_at)
-      ORDER BY day ASC
-      `,
+      ORDER BY day ASC`,
       [Number(days)]
     );
     return rows;
   },
 
-  /**
-   * Top active users
-   */
   async getTopUsers(limit = 10) {
     const [rows] = await db.execute(
-      `
-      SELECT
-        u.user_id,
-        u.first_name,
-        u.last_name,
-        u.email,
-        u.role,
+      `SELECT
+        u.user_id, u.first_name, u.last_name, u.email, u.role,
         COUNT(l.activity_id) AS activity_count
       FROM USER u
       LEFT JOIN USER_ACTIVITY_LOG l ON u.user_id = l.user_id
       GROUP BY u.user_id, u.first_name, u.last_name, u.email, u.role
       ORDER BY activity_count DESC
-      LIMIT ?
-      `,
+      LIMIT ?`,
       [Number(limit)]
     );
     return rows;
