@@ -122,6 +122,15 @@ app.get("/api/analytics", async (req, res) => {
             "SELECT * FROM USER_ACTIVITY_LOG ORDER BY created_at DESC LIMIT 5"
         );
 
+        const [errorResult] = await db.query(`
+            SELECT COUNT(*) as count 
+            FROM USER_ACTIVITY_LOG 
+            WHERE activity_type = 'SYSTEM_ERROR' 
+            AND created_at >= NOW() - INTERVAL 24 HOUR
+        `);
+
+        const systemErrors = errorResult[0].count;
+
         const recentLogs = logs.map(l => ({
             type:
                 l.action ||
@@ -143,7 +152,7 @@ app.get("/api/analytics", async (req, res) => {
             activeUsers,
             modulesLive,
             aiRequestsToday,
-            systemErrors: 0,
+            systemErrors,
             activeModules: activeModulesList,
             recentLogs
         });
