@@ -1,3 +1,7 @@
+* {
+  box-sizing: border-box;
+}
+
 .app-shell {
   width: 100%;
   min-height: 100vh;
