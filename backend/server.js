@@ -116,14 +116,30 @@ app.get("/api/analytics", async (req, res) => {
 
         const aiRequestsToday = aiResult[0].count;
 
-        const [dbModules] = await db.query(
-            "SELECT module_id, module_name FROM MODULE LIMIT 4"
-        );
+        const [dbModules] = await db.query(`
+            SELECT m.module_id, m.module_name, COUNT(cs.module_id) AS usage_count
+            FROM MODULE m
+            LEFT JOIN CHAT_SESSION cs ON m.module_id = cs.module_id
+            GROUP BY m.module_id, m.module_name
+            ORDER BY usage_count DESC
+            LIMIT 4
+        `);
 
-        const activeModulesList = dbModules.map((m, index) => ({
-            name: m.module_name,
-            percentage: 100 - (index * 20)
-        }));
+        // Get the highest AI request count (the top module) to use as the 100% baseline
+        const maxUsage = dbModules.length > 0 && dbModules[0].usage_count > 0 
+            ? Number(dbModules[0].usage_count) 
+            : 1;
+
+        // Calculate percentages proportionally based on real AI chat volume
+        const activeModulesList = dbModules.map((m) => {
+            const usage = Number(m.usage_count) || 0;
+            const percentage = Math.round((usage / maxUsage) * 100);
+            
+            return {
+                name: m.module_name,
+                percentage: percentage
+            };
+        });
 
         const [logs] = await db.query(
             "SELECT * FROM USER_ACTIVITY_LOG ORDER BY created_at DESC LIMIT 5"
