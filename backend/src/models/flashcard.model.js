@@ -59,10 +59,7 @@ const Flashcard = {
       [flashcardSetId]
     );
 
-    return {
-      ...sets[0],
-      cards,
-    };
+    return { ...sets[0], cards };
   },
 
   async getSetsByUser(userId, moduleId = null) {

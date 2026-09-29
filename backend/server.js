@@ -61,10 +61,6 @@ app.use("/api/flashcards", flashcardRoutes);
 const announcementRoutes = require("./src/routes/announcement.routes");
 app.use("/api/announcements", announcementRoutes);
 
-// Summaries
-const summaryRoutes = require("./src/routes/summary.routes");
-app.use("/api/summaries", summaryRoutes);
-
 // Quizzes
 const quizRoutes = require("./src/routes/quiz.routes");
 app.use("/api/quizzes", quizRoutes);
