@@ -7,7 +7,7 @@ const Quiz = {
       await connection.beginTransaction();
 
       const [quizResult] = await connection.execute(
-        `INSERT INTO quiz (user_id, module_id, document_id, title, created_at)
+        `INSERT INTO QUIZ (user_id, module_id, document_id, title, created_at)
          VALUES (?, ?, ?, ?, NOW())`,
         [userId, moduleId, documentId || null, title]
       );
@@ -18,7 +18,7 @@ const Quiz = {
         for (let i = 0; i < questions.length; i++) {
           const q = questions[i];
           await connection.execute(
-            `INSERT INTO quiz_question
+            `INSERT INTO QUIZ_QUESTION
              (quiz_id, question_order, question_text, options_json, correct_answer, explanation)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [
@@ -46,9 +46,9 @@ const Quiz = {
   async getById(quizId, userId) {
     const [quizzes] = await db.execute(
       `SELECT q.*, d.title AS document_title, m.module_name
-       FROM quiz q
-       LEFT JOIN document d ON q.document_id = d.document_id
-       LEFT JOIN module m ON q.module_id = m.module_id
+       FROM QUIZ q
+       LEFT JOIN DOCUMENT d ON q.document_id = d.document_id
+       LEFT JOIN MODULE m ON q.module_id = m.module_id
        WHERE q.quiz_id = ? AND q.user_id = ?`,
       [quizId, userId]
     );
@@ -57,7 +57,7 @@ const Quiz = {
 
     const [questions] = await db.execute(
       `SELECT question_id, question_order, question_text, options_json, correct_answer, explanation
-       FROM quiz_question
+       FROM QUIZ_QUESTION
        WHERE quiz_id = ?
        ORDER BY question_order ASC`,
       [quizId]
@@ -78,10 +78,10 @@ const Quiz = {
     let query = `
       SELECT q.quiz_id, q.title, q.module_id, q.document_id, q.created_at,
              m.module_name, d.title AS document_title,
-             (SELECT COUNT(*) FROM quiz_question qq WHERE qq.quiz_id = q.quiz_id) AS question_count
+             (SELECT COUNT(*) FROM QUIZ_QUESTION qq WHERE qq.quiz_id = q.quiz_id) AS question_count
       FROM QUIZ q
-      LEFT JOIN module m ON q.module_id = m.module_id
-      LEFT JOIN document d ON q.document_id = d.document_id
+      LEFT JOIN MODULE m ON q.module_id = m.module_id
+      LEFT JOIN DOCUMENT d ON q.document_id = d.document_id
       WHERE q.user_id = ?
     `;
     const params = [userId];
@@ -107,7 +107,7 @@ const Quiz = {
 
   async saveAttempt({ quizId, userId, answers, score }) {
     const [result] = await db.execute(
-      `INSERT INTO quiz_attempt (quiz_id, user_id, answers_json, score, started_at, completed_at)
+      `INSERT INTO QUIZ_ATTEMPT (quiz_id, user_id, answers_json, score, started_at, completed_at)
        VALUES (?, ?, ?, ?, NOW(), NOW())`,
       [quizId, userId, JSON.stringify(answers || {}), score]
     );
@@ -117,7 +117,7 @@ const Quiz = {
   async getAttempts(quizId, userId) {
     const [rows] = await db.execute(
       `SELECT attempt_id, answers_json, score, started_at, completed_at
-       FROM quiz_attempt
+       FROM QUIZ_ATTEMPT
        WHERE quiz_id = ? AND user_id = ?
        ORDER BY completed_at DESC`,
       [quizId, userId]
