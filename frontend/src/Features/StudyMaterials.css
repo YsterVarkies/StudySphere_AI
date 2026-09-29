@@ -137,9 +137,8 @@
   font-size: 13px;
 }
 
+
 .study-materials-page__chat-btn {
-  margin-top: 16px;
-  width: 100%;
   padding: 10px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
@@ -152,11 +151,45 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: background 0.2s;
+  transition: opacity 0.2s;
 }
 
 .study-materials-page__chat-btn:hover {
   background: #f8fafc;
+}
+
+.study-materials-page__document-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.study-materials-page__document-actions button {
+  flex: 1;
+  height: 42px;
+  margin-top: 0;
+  box-sizing: border-box;
+}
+
+.study-materials-page__open-btn {
+  padding: 10px;
+  background: #e07a19;
+  border: 1px solid #e07a19;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: opacity 0.2s;
+}
+
+.study-materials-page__open-btn:hover {
+  opacity: 0.9;
 }
 
 .study-materials-page__dropzone-card {

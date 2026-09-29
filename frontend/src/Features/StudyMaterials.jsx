@@ -224,6 +224,46 @@ function StudyMaterials() {
         }
     }
 
+    async function handleOpenDocument(document) {
+        const documentId = document.document_id || document.id;
+
+        if (!documentId) {
+            setError("Could not identify this document.");
+            return;
+        }
+        try {
+            setError("");
+
+            const token = getToken();
+            if (!token) {
+                setError("You are not authenticated. Please log in again.");
+                return;
+            }
+            const response = await fetch(
+                `${API_URL}/documents/${documentId}/download`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+            if (!response.ok) {
+                throw new Error(`Could not open document (Status: ${response.status})`);
+            }
+            const blob = await response.blob();
+            const fileUrl = URL.createObjectURL(blob);
+            window.open(fileUrl, "_blank", "noopener,noreferrer");
+
+            //Clean up the temporaty browser URl later
+            setTimeout(() => {
+                URL.revokeObjectURL(fileUrl);
+            }, 60000);
+        } catch (error) {
+            console.error("Open document error:", error);
+            setError(error.message || "Could not open document.");
+        }
+    }
+
     // helper function to extract document name safely from various schema property names
     function getDocumentName(document) {
         return (document.name || document.file_name || document.fileName || document.title || document.filename || "Untitled Document");
@@ -444,11 +484,18 @@ function StudyMaterials() {
                                     </div>
 
                                     {/* Actions Footer Container */}
-                                    <div style={{ display: "flex", gap: "8px", marginTop: "12px", width: "100%" }}>
+                                    <div className="study-materials-page__document-actions">
                                         <button
-                                            className="study-materials-page__chat-btn"
                                             type="button"
-                                            style={{ flex: 1, margin: 0 }}
+                                            className="study-materials-page__open-btn"
+                                            onClick={() => handleOpenDocument(document)}
+                                        >
+                                            Open Document
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            className="study-materials-page__chat-btn"
                                             onClick={() => {
                                                 setActiveChatDoc(document);
                                                 setActiveView("chat");
@@ -456,7 +503,6 @@ function StudyMaterials() {
                                         >
                                             💬 Chat with this
                                         </button>
-
                                     </div>
                                 </article>
                             );
