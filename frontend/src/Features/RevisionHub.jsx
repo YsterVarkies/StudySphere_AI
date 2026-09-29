@@ -42,6 +42,7 @@ function RevisionHub() {
     const [documents, setDocuments] = useState([]);
     const [selectedDocument, setSelectedDocument] = useState("");
     const [number, setNumber] = useState(5);
+    const [difficulty, setDifficulty] = useState("medium");
     const [mode, setMode] = useState(null);
     const [content, setContent] = useState(null);
     const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -164,18 +165,12 @@ function RevisionHub() {
         try {
             const token = getToken();
 
-            console.log("SESSION:", getSession());
-            console.log("USER ID:", getUserId());
-            console.log("TOKEN EXISTS:", !!getToken());
-            console.log("SELECTED DOCUMENT:", document);
-            console.log("DOCUMENT ID:", documentId);
-            console.log("MODULE ID:", moduleId);
-
             const requestBody = type === "quiz" ? {
                 userId: getUserId(),
                 documentId: Number(documentId),
                 moduleId: Number(moduleId),
                 numberOfQuestions: requestedNumber,
+                difficulty: difficulty,
                 title: `Quiz - ${getDocumentName(document)}`,
             }
                 : {
@@ -183,6 +178,7 @@ function RevisionHub() {
                     documentId: Number(documentId),
                     moduleId: Number(moduleId),
                     numberOfCards: requestedNumber,
+                    difficulty: difficulty,
                     title: `Flashcards - ${getDocumentName(document)}`,
                 };
             console.log(`Generating ${type}:`, requestBody);
@@ -256,6 +252,85 @@ function RevisionHub() {
 
     const questions = getQuestions();
     const cards = getCards();
+    const currentQuizQuestion = questions[currentQuestion];
+    const currentCard = cards[currentQuestion];
+
+    function getQuestionText(question) {
+        return (
+            question?.question ||
+            question?.text ||
+            question?.prompt ||
+            `Question ${currentQuestion + 1}`
+        );
+    }
+
+    function getQuestionOptions(question) {
+        return (
+            question?.options ||
+            question?.choices ||
+            question?.answers ||
+            []
+        );
+    }
+
+    function getCorrectAnswer(question) {
+        return (
+            question?.answer ||
+            question?.correctAnswer ||
+            question?.correct_option ||
+            question?.correctOption
+        );
+    }
+
+    function getOptionText(option) {
+        if (typeof option === "string") {
+            return option;
+        }
+        return option?.text || option?.answer || "";
+    }
+
+    function isAnswerCorrect(question, option) {
+        const correctAnswer = getCorrectAnswer(question);
+
+        return getOptionText(option) === correctAnswer;
+    }
+
+    function nextQuestion() {
+        if (currentQuestion < questions.length - 1) {
+            setCurrentQuestion((current) => current + 1);
+            setShowAnswer(false);
+        }
+    }
+
+    function previousQuestion() {
+        if (currentQuestion > 0) {
+            setCurrentQuestion((current) => current - 1);
+            setShowAnswer(false);
+        }
+    }
+
+    function nextCard() {
+        if (currentQuestion < cards.length - 1) {
+            setCurrentQuestion((current) => current + 1);
+            setShowAnswer(false);
+        }
+    }
+
+    function previousCard() {
+        if (currentQuestion > 0) {
+            setCurrentQuestion((current) => current - 1);
+            setShowAnswer(false);
+        }
+    }
+
+    function resetRevisionContent() {
+        setContent(null);
+        setMode(null);
+        setCurrentQuestion(0);
+        setSelectedAnswer({});
+        setShowAnswer(false);
+        setError("");
+    }
 
     return (
         <main className="revision-hub-page">
@@ -265,17 +340,12 @@ function RevisionHub() {
             </header>
 
             <section className="revision-hub-page__controls">
-                <label>Study material
+                <label>Study Materials
                     <select
                         value={selectedDocument}
                         onChange={(event) => {
                             setSelectedDocument(event.target.value);
-                            setContent(null);
-                            setMode(null);
-                            setError("");
-                            setCurrentQuestion(0);
-                            setSelectedAnswer({});
-                            setShowAnswer(false);
+                            resetRevisionContent();
                         }}
                     >
                         <option
@@ -303,13 +373,33 @@ function RevisionHub() {
                     <input
                         type="number"
                         min="1"
-                        max="50"
                         value={number}
                         onChange={(event) => {
                             const nextValue = Number(event.target.value);
-                            setNumber(Number.isNaN(nextValue) ? 1 : nextValue);
+                            setNumber(Number.isNaN(nextValue) || nextValue < 1 ? 1 : nextValue);
                         }}
                     />
+                </label>
+
+                <label>
+                    Difficulty
+
+                    <select
+                        value={difficulty}
+                        onChange={(event) => setDifficulty(event.target.value)}
+                    >
+                        <option value="easy">
+                            Easy - Recall
+                        </option>
+
+                        <option value="medium">
+                            Medium - Apply
+                        </option>
+
+                        <option value="hard">
+                            Hard - Analyse
+                        </option>
+                    </select>
                 </label>
 
                 <div className="revision-hub-page__buttons">
@@ -345,146 +435,212 @@ function RevisionHub() {
                 </div>
             )}
 
-            {mode === "quiz" && questions.length > 0 && (
+            {mode === "quiz" && questions.length > 0 && currentQuizQuestion && (
                 <section className="revision-hub-page__content">
-                    <h2>Quiz</h2>
-                    {questions.map((question, index) => {
-                        const text =
-                            question.question ||
-                            question.text ||
-                            question.prompt ||
-                            `Question ${index + 1}`;
+                    <div className="revision-hub-page__quiz-header">
+                        <div>
+                            <h2>Quiz</h2>
 
-                        const options =
-                            question.options ||
-                            question.choices ||
-                            question.answers ||
-                            [];
+                            <p>
+                                {difficulty.charAt(0).toUpperCase() +
+                                    difficulty.slice(1)}{" "}
+                                difficulty
+                            </p>
+                        </div>
+                        <span>
+                            Question {currentQuestion + 1} of {""}
+                            {questions.length}
+                        </span>
+                    </div>
 
-                        const correctAnswer =
-                            question.answer ||
-                            question.correctAnswer ||
-                            question.correct_option ||
-                            question.correctOption;
+                    <div className="revision-hub-page__progress">
+                        <div className="revision-hub-page__progress-bar"
+                            style={{
+                                width: `${((currentQuestion + 1) /
+                                    questions.length) *
+                                    100
+                                    }%`,
+                            }}
+                        />
+                    </div>
 
-                        return (
-                            <article
-                                className="revision-hub-page__question"
-                                key={index}
-                            >
-                                <h3>
-                                    {index + 1}.{text}
-                                </h3>
+                    <article className="revision-hub-page__question">
+                        <h3>
+                            {getQuestionText(currentQuizQuestion)}
+                        </h3>
 
-                                <div>
-                                    {options.map((option, optionIndex) => {
-                                        const value =
-                                            typeof option === "string"
-                                                ? option
-                                                : option.text || option.answer || "";
+                        <div>
+                            {getQuestionOptions(currentQuizQuestion).map((option, optionIndex) => {
+                                const value = getOptionText(option);
 
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={optionIndex}
-                                                className={
-                                                    selectedAnswer[index] === optionIndex
-                                                        ? "revision-hub-page__option revision-hub-page__option--selected"
-                                                        : "revision-hub-page__option"
-                                                }
-                                                onClick={() => {
-                                                    setCurrentQuestion(index);
-                                                    setSelectedAnswer((previous) => ({
-                                                        ...previous,
-                                                        [index]: optionIndex,
-                                                    }));
-                                                }}
-                                            >
-                                                {value}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                const isSelected =
+                                    selectedAnswer[currentQuestion] === optionIndex;
 
-                                {showAnswer && (
-                                    <p className="revision-hub-page__correct-answer">
-                                        <strong>
-                                            Answer:
-                                        </strong>{" "}
-                                        {correctAnswer ||
-                                            "Answer provided by backend."}
-                                    </p>
-                                )}
-                            </article>
-                        );
-                    })}
+                                const isCorrect = isAnswerCorrect(
+                                    currentQuizQuestion,
+                                    option
+                                );
+
+                                let optionClass = "revision-hub-page__option";
+
+                                if (isSelected && isCorrect) {
+                                    optionClass += " revision-hub-page__option--correct";
+                                } else if (isSelected && !isCorrect) {
+                                    optionClass += " revision-hub-page__option--wrong";
+                                }
+
+                                return (
+                                    <button
+                                        type="button"
+                                        key={optionIndex}
+                                        className={optionClass}
+                                        onClick={() => {
+                                            setSelectedAnswer((previous) => ({
+                                                ...previous,
+                                                [currentQuestion]: optionIndex,
+                                            }));
+
+                                            setShowAnswer(true);
+                                        }}
+                                    >
+                                        <span>{value}</span>
+
+                                        {isSelected && (
+                                            <span className="revision-hub-page__option-result">
+                                                {isCorrect ? "✓ Correct" : "✕ Incorrect"}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {getQuestionOptions(currentQuizQuestion).length === 0 && (
+                            <p className="revision-hub-page__no-options">
+                                This question does not have multiple-choice options.
+                            </p>
+                        )}
+
+                        {showAnswer && (
+                            <div className="revision-hub-page__correct-answer" >
+                                <strong>Answer</strong>
+                                <p>
+                                    {getCorrectAnswer(
+                                        currentQuizQuestion
+                                    ) || "Answer provided by backend."}
+                                </p>
+                            </div>
+                        )}
+                    </article>
+
+                    <div className="revision-hub-page__quiz-actions" >
+                        <button
+                            type="button"
+                            className="revision-hub-page__secondary-button"
+                            onClick={previousQuestion}
+                            disabled={currentQuestion === 0}
+                        >
+                            Previous
+                        </button>
+
+                        <button
+                            type="button"
+                            className="revision-hub-page__answer-button"
+                            onClick={() =>
+                                setShowAnswer((current) => !current)
+                            }
+                        >
+                            {showAnswer
+                                ? "Hide answer"
+                                : "Show answer"}
+                        </button>
+
+                        <button
+                            type="button"
+                            className="revision-hub-page__next-button"
+                            onClick={nextQuestion}
+                            disabled={
+                                currentQuestion ===
+                                questions.length - 1
+                            }
+                        >
+                            Next
+                        </button>
+                    </div>
+                </section>
+            )}
+
+            {mode === "flashcards" && cards.length > 0 && currentCard && (
+                <section className="revision-hub-page__flashcards">
+                    <div className="revision-hub-page__flashcards-header">
+                        <div>
+                            <h2>Flashcards</h2>
+                            <p>Click the card to reveal the answer.</p>
+                        </div>
+
+                        <span> Card {currentQuestion + 1} of {" "} {cards.length} </span>
+                    </div>
+
+                    <div className="revision-hub-page__progress">
+                        <div className="revision-hub-page__progress-bar"
+                            style={{
+                                width: `${((currentQuestion + 1) / cards.length) * 100}%`,
+                            }}
+                        />
+                    </div>
 
                     <button
                         type="button"
-                        className="revision-hub-page__answer-button"
-                        onClick={() => setShowAnswer(!showAnswer)}
+                        className="revision-hub-page__flashcard"
+                        onClick={() =>
+                            setShowAnswer((current) => !current)
+                        }
                     >
-                        {showAnswer ? "Hide answers" : "Show answers"}
+                        <span> {showAnswer ? "Answer" : "Question"} </span>
+
+                        <strong>
+                            {!showAnswer
+                                ? currentCard.question ||
+                                currentCard.front ||
+                                currentCard.term ||
+                                "Question"
+                                : currentCard.answer ||
+                                currentCard.back ||
+                                currentCard.definition ||
+                                "Answer"}
+                        </strong>
+                        <small>
+                            {showAnswer
+                                ? "Click to see the question"
+                                : "Click to reveal the answer"}
+                        </small>
                     </button>
-                </section>
-            )}
+                    <div className="revision-hub-page__flashcard-actions">
+                        <button
+                            type="button"
+                            className="revision-hub-page__secondary-button"
+                            onClick={previousCard}
+                            disabled={currentQuestion === 0}
+                        >
+                            Previous
+                        </button>
 
-
-            {mode === "flashcards" && cards.length > 0 && (
-                <section className="revision-hub-page__flashcards">
-                    <h2>Flashcards</h2>
-
-                    {cards.map((card, index) => {
-                        const isShowingAnswer = showAnswer && currentQuestion === index;
-                        return (
-                            <button
-                                type="button"
-                                className="revision-hub-page__flashcard"
-                                key={index}
-                                onClick={() => {
-                                    setCurrentQuestion(index);
-                                    setShowAnswer(isShowingAnswer ? false : true);
-                                }}
-                            >
-                                {!isShowingAnswer ? (
-                                    <>
-                                        <span>Question</span>
-                                        <strong>
-                                            {card.question ||
-                                                card.front ||
-                                                card.term ||
-                                                "Question"}
-                                        </strong>
-                                    </>
-                                ) : (
-                                    <>
-                                        <span>Answer</span>
-                                        <strong>
-                                            {card.answer ||
-                                                card.back ||
-                                                card.definition ||
-                                                "Answer"}
-                                        </strong>
-                                    </>
-                                )}
-                            </button>
-                        );
-                    }
-                    )}
-                </section>
-            )}
-
-            {!loading &&
-                mode &&
-                questions.length === 0 &&
-                cards.length === 0 &&
-                !error && (
-                    <div className="revision-hub-page__empty">
-                        No revision content was returned.
+                        <button
+                            type="button"
+                            className="revision-hub-page__next-button"
+                            onClick={nextCard}
+                            disabled={currentQuestion === cards.length - 1}
+                        >
+                            Next
+                        </button>
                     </div>
-                )}
+                </section>
+            )}
+            {!loading && mode && questions.length === 0 && cards.length === 0 && !error && (
+                <div className="revision-hub-page__empty">
+                    No revision content was returned.
+                </div>
+            )}
         </main>
     );
 }
-
 export default RevisionHub;
