@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import "./AIChat.css";
 
 const API_URL = "http://localhost:5000/api";
@@ -40,6 +42,8 @@ function getToken() {
 
 function AIChat({ initialDocument }) {
     const initialDocumentId = initialDocument ? initialDocument.document_id || initialDocument.id : null;
+    const initialisedDocumentRef = useRef(null);
+    const sessionInitialisingRef  = useRef(false);
     const [documents, setDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState(initialDocumentId ? [initialDocumentId] : []);
     const [sessionId, setSessionId] = useState(null);
@@ -78,6 +82,7 @@ function AIChat({ initialDocument }) {
         if (selectedDocuments.length === 0) {
             setSessionId(null);
             setMessages([]);
+            initialisedDocumentRef.current = null;
             return;
         }
 
@@ -91,6 +96,19 @@ function AIChat({ initialDocument }) {
             return;
         }
 
+        const documentId = selectedDocuments[0];
+
+        //don't initialise another session for the same document.
+        if (initialisedDocumentRef.current === documentId) {
+            return;
+        }
+
+        //don't start another session while one is already being created.
+        if (sessionInitialisingRef.current) {
+            return;
+        }
+
+        initialisedDocumentRef.current = documentId;
         initialiseSession();
     }, [selectedDocuments, documents, initialDocument]);
 
@@ -151,11 +169,10 @@ function AIChat({ initialDocument }) {
         if (selectedDocuments.length === 0) {
             return null;
         }
-        console.log("AI CHAT SESSION:", getSession());
-        console.log("AI CHAT USER ID:", getUserId());
-        console.log("AI CHAT TOKEN EXISTS:", !!getToken());
-        console.log("AI CHAT SELECTED DOCUMENTS:", selectedDocuments);
-        console.log("AI CHAT INITIAL DOCUMENT:", initialDocument);
+
+        if (sessionInitialisingRef.current) {
+            return null;
+        }
 
         const documentId = selectedDocuments[0];
 
@@ -176,6 +193,8 @@ function AIChat({ initialDocument }) {
             setError("The selected document does not have a module ID.");
             return null;
         }
+
+        sessionInitialisingRef.current = true;
         try {
             setInitialisingSession(true);
             setError("");
@@ -231,6 +250,7 @@ function AIChat({ initialDocument }) {
             setError(error.message || "Could not initialise the AI chat.");
             return null;
         } finally {
+            sessionInitialisingRef.current = false;
             setInitialisingSession(false);
         }
     }
@@ -339,7 +359,7 @@ function AIChat({ initialDocument }) {
             });
             setQuestion(currentQuestion);
 
-            setError(error.message || "Somthing went wrong while contacting the AI.");
+            setError("The AI service is temporarily unavailable. Please try again in a moment.");
         }
         finally {
             setLoading(false);
@@ -401,7 +421,15 @@ function AIChat({ initialDocument }) {
                                 {message.role === "user" ? "You" : "AI Assistant"}
                             </strong>
 
-                            <p>{message.content}</p>
+                            <div className="ai-chat-page__message-content">
+                                {message.role === "assistant" ? (
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {message.content}
+                                    </ReactMarkdown>
+                                ) : (
+                                    <span>{message.content}</span>
+                                )}
+                            </div>
 
                             {message.sources?.length > 0 && (
                                 <div className="ai-chat-page__sources">
@@ -411,9 +439,9 @@ function AIChat({ initialDocument }) {
                                             {typeof source === "string"
                                                 ? source
                                                 : source.file_name ||
-                                                source.name ||
-                                                source.title ||
-                                                `Source ${sourceIndex + 1}`}
+                                                  source.name ||
+                                                  source.title ||
+                                                  `Source ${sourceIndex + 1}`}
                                         </span>
                                     ))}
                                 </div>

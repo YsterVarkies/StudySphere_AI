@@ -197,8 +197,20 @@ function RevisionHub() {
             console.log(`${type} response:`, data);
 
             if (!response.ok) {
+                if (response.status === 502) {
+                    throw new Error(
+                        `The AI service is temporarily unavailable. Please try generating the ${type} again in a moment.`
+                    );
+                }
+
+                if (response.status === 503) {
+                    throw new Error(
+                        `The AI service is currently unavailable. Please try again shortly.`
+                    );
+                }
+
                 throw new Error(
-                    data.message || `Could not generate ${type}.`
+                    data.message || `Could not generate ${type}. Please try again.`
                 );
             }
 
@@ -213,7 +225,11 @@ function RevisionHub() {
             setContent(generated);
         } catch (error) {
             console.error(`Generate ${type} error:`, error);
-            setError(error.message || `Could not generate ${type}.`);
+            setContent(null);
+            setError(
+                error.message ||
+                `Could not generate ${type}. Please try again.`
+            );
         } finally {
             setLoading(false);
         }
