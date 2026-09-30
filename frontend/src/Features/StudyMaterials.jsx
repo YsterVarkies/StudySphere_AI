@@ -65,7 +65,6 @@ function StudyMaterials() {
     const [uploading, setUploading] = useState(false); // upload network request state
     const [error, setError] = useState(""); // error message banner
     const [message, setMessage] = useState(""); // success message banner
-
     const [activeView, setActiveView] = useState("list"); // view toggle: "list" or "chat"
     const [activeChatDoc, setActiveChatDoc] = useState(null); //document selected for AI chat 
 
@@ -140,8 +139,11 @@ function StudyMaterials() {
         setError("");
         setMessage("");
 
+        const fileExtension = file.name.split(".").pop()?.toLowerCase();
+        const allowedExtensions = ["pdf", "docx", "txt"];
+
         //validate supported file extensions/types
-        if (!ALLOWED_TYPES.includes(file.type)) {
+        if (!ALLOWED_TYPES.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
             setError("Invalid file type. Please upload a PDF, DOCX, or TXT file.");
             event.target.value = "";
             return;
@@ -176,7 +178,7 @@ function StudyMaterials() {
         // match selected module option against id, module_id, or code to ensure correct linkage
         const foundModule = modules.find(
             (mod) => String(mod.id || mod.module_id || mod.code) === String(activeModuleId)
-        )
+        );
         // resolve the precise identifier required by the backend database foreign key column
         const targetModuleValue = foundModule
             ? (foundModule.id || foundModule.module_id || foundModule.code)
