@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import AIChat from "./AIChat";
 import "./StudyMaterials.css"; // Import the CSS file for styling
 
-//Global configuration constants 
+/* Global configuration constants  */
 const API_URL = "http://localhost:5000/api"; // Backend API base URL
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB file size limit 
 
@@ -13,6 +13,7 @@ const ALLOWED_TYPES = [
     "text/plain", // .txt files
 ];
 
+/* SESSION HELPERS */
 function getSession() {
     try {
         const raw = localStorage.getItem("studysphere_session");
@@ -225,7 +226,7 @@ function StudyMaterials() {
             setUploading(false);
         }
     }
-
+/* OPEN DOCUMENT */
     async function handleOpenDocument(document) {
         const documentId = document.document_id || document.id;
 
@@ -377,9 +378,6 @@ function StudyMaterials() {
                                 placeholder="Enter document title"
                             />
                         </div>
-                        {/* ---------------------------------- */}
-
-
 
                         <div className="study-materials-module">
                             <label htmlFor="study-materials-module">Module</label>
