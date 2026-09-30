@@ -291,10 +291,11 @@ function RevisionHub() {
 
     function getCorrectAnswer(question) {
         return (
-            question?.answer ||
+            question?.correct_answer ||
             question?.correctAnswer ||
             question?.correct_option ||
-            question?.correctOption
+            question?.correctOption ||
+            question?.answer
         );
     }
 
@@ -302,14 +303,45 @@ function RevisionHub() {
         if (typeof option === "string") {
             return option;
         }
-        return option?.text || option?.answer || "";
+        return (
+            option?.text ||
+            option?.answer ||
+            option?.option ||
+            option?.label ||
+            ""
+        );
     }
 
-    function isAnswerCorrect(question, option) {
+    function getCorrectOptionIndex(question) {
         const correctAnswer = getCorrectAnswer(question);
 
-        return getOptionText(option) === correctAnswer;
+        if (typeof correctAnswer !== "string") {
+            return -1;
+        }
+
+        const answer = correctAnswer.trim().toUpperCase();
+
+        if (answer.length !== 1) {
+            return -1;
+        }
+
+        return answer.charCodeAt(0) - "A".charCodeAt(0);
     }
+
+    function getCorrectOption(question) {
+        const options = getQuestionOptions(question);
+        const correctIndex = getCorrectOptionIndex(question);
+
+        if (correctIndex < 0 || correctIndex >= options.length) {
+            return null;
+        }
+        return options[correctIndex];
+    }
+
+    function isAnswerCorrect(question, optionIndex) {
+        return optionIndex === getCorrectOptionIndex(question);
+    }
+        
 
     function nextQuestion() {
         if (currentQuestion < questions.length - 1) {
@@ -494,7 +526,7 @@ function RevisionHub() {
 
                                 const isCorrect = isAnswerCorrect(
                                     currentQuizQuestion,
-                                    option
+                                    optionIndex
                                 );
 
                                 let optionClass = "revision-hub-page__option";
@@ -540,9 +572,7 @@ function RevisionHub() {
                             <div className="revision-hub-page__correct-answer" >
                                 <strong>Answer</strong>
                                 <p>
-                                    {getCorrectAnswer(
-                                        currentQuizQuestion
-                                    ) || "Answer provided by backend."}
+                                    {getOptionText(getCorrectOption(currentQuizQuestion)) || "The correct answer is unavailable."}
                                 </p>
                             </div>
                         )}
@@ -615,11 +645,13 @@ function RevisionHub() {
 
                         <strong>
                             {!showAnswer
-                                ? currentCard.question ||
+                                ? currentCard.front_text ||
+                                currentCard.question ||
                                 currentCard.front ||
                                 currentCard.term ||
                                 "Question"
-                                : currentCard.answer ||
+                                : currentCard.back_text ||
+                                currentCard.answer ||
                                 currentCard.back ||
                                 currentCard.definition ||
                                 "Answer"}
