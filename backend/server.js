@@ -87,9 +87,11 @@ app.get("/api/analytics", async (req, res) => {
 
         const modulesLive = moduleCountResult[0].count;
 
-        const [aiResult] = await db.query(
-            "SELECT COUNT(*) as count FROM CHAT_MESSAGE"
-        );
+        const [aiResult] = await db.query(`
+            SELECT COUNT(*) as count 
+            FROM CHAT_MESSAGE 
+            WHERE DATE(created_at) = CURDATE()
+        `);
 
         const aiRequestsToday = aiResult[0].count;
 
