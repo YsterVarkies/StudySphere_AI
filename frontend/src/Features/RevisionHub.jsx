@@ -1,4 +1,4 @@
-import { Component, useEffect, useState } from "react";  // React hooks, useState- stores changing data and useEffect- run code when things happen, like the component first loads.
+import {  useEffect, useState } from "react";  // React hooks, useState- stores changing data and useEffect- run code when things happen, like the component first loads.
 import "./RevisionHub.css"; // imports the CSS file for this component
 
 const API_URL = "http://localhost:5000/api"; // base URL for Backend API
