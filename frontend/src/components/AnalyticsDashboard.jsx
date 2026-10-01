@@ -66,7 +66,7 @@ export default function AnalyticsDashboard() {
       {/* Top Metric Cards Grid */}
       <section className="metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
         <div className="metric-card panel" style={{ background: '#fff', padding: '20px', borderRadius: '8px' }}>
-        <h3 style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '8px' }}>Active users (7d)</h3>
+        <h3 style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '8px' }}>Active users</h3>
         <div className="metric-value" style={{ fontSize: '1.875rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
           {stats.activeUsers}
         </div>
