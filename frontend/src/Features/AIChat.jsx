@@ -3,8 +3,10 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./AIChat.css";
 
+/* GLOBAL CONFIGURATION */
 const API_URL = "http://localhost:5000/api";
 
+/* SESSION HELPERS */
 function getSession() {
     try {
         const raw = localStorage.getItem("studysphere_session");
@@ -32,18 +34,20 @@ function getSession() {
     }
 }
 
+//GET USER ID
 function getUserId() {
     return getSession()?.user?.user_id || "";
 }
-
+//GET AUTHENTICATION TOKEN
 function getToken() {
     return getSession()?.token || "";
 }
 
+/* MAIN COMPONENT */
 function AIChat({ initialDocument }) {
     const initialDocumentId = initialDocument ? initialDocument.document_id || initialDocument.id : null;
     const initialisedDocumentRef = useRef(null);
-    const sessionInitialisingRef  = useRef(false);
+    const sessionInitialisingRef = useRef(false);
     const [documents, setDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState(initialDocumentId ? [initialDocumentId] : []);
     const [sessionId, setSessionId] = useState(null);
@@ -112,6 +116,7 @@ function AIChat({ initialDocument }) {
         initialiseSession();
     }, [selectedDocuments, documents, initialDocument]);
 
+    /* LOAD DOCUMENTS */
     async function loadDocuments() {
         try {
 
@@ -144,6 +149,7 @@ function AIChat({ initialDocument }) {
         }
     }
 
+    /* DOCUMENT HELPER FUNCTIONS */
     function getDocumentId(document) {
         return (document.document_id || document.id);
     }
@@ -255,6 +261,7 @@ function AIChat({ initialDocument }) {
         }
     }
 
+    /* SELECT/DESELECT DOCUMENT */
     function toggleDocument(id) {
         setSelectedDocuments((current) => {
             if (current.includes(id)) {
@@ -265,6 +272,7 @@ function AIChat({ initialDocument }) {
         });
     }
 
+    /* SEND QUESTION TO AI */
     async function sendQuestion(event) {
         event.preventDefault();
 
@@ -306,6 +314,7 @@ function AIChat({ initialDocument }) {
                 throw new Error("Could not create a chat session.");
             }
 
+            /* SEND THE QUESTION TO THE BACKEND */
             const token = getToken();
             const response = await fetch(`${API_URL}/chat/message`, {
                 method: "POST",
@@ -328,6 +337,7 @@ function AIChat({ initialDocument }) {
                 );
             }
 
+            /* FIND THE AI RESPONSE */
             const answer =
                 data.data?.aiReply ||
                 data.aiReply ||
@@ -366,13 +376,15 @@ function AIChat({ initialDocument }) {
         }
     }
 
+    /*  USER INTERFACE */
     return (
         <main className="ai-chat-page">
+            {/* PAGE HEADER */}
             <header className="ai-chat-page__header">
                 <h1>AI Chat Assistant</h1>
                 <p>Ask questions about your selected study materials.</p>
             </header>
-
+            {/* DOCUMENT SELECTION */}
             <section className="ai-chat-page__documents">
                 <h2>Study Materials</h2>
                 {documents.length === 0 ? (
@@ -399,15 +411,16 @@ function AIChat({ initialDocument }) {
                     </div>
                 )}
             </section>
-
+            {/* CHAT AREA */}
             <section className="ai-chat-page__chat">
                 <div className="ai-chat-page__messages">
+                    {/* EMPTY CHAT MESSAGE */}
                     {messages.length === 0 && (
                         <div className="ai-chat-page__empty">
                             {initialisingSession ? "Preparing your AI Study Session..." : "Ask a question to get started."}
                         </div>
                     )}
-
+                    {/* MESSAGE LIST */}
                     {messages.map((message, index) => (
                         <div
                             key={index}
@@ -420,7 +433,7 @@ function AIChat({ initialDocument }) {
                             <strong>
                                 {message.role === "user" ? "You" : "AI Assistant"}
                             </strong>
-
+                            {/* MESSAGE CONTENT */}
                             <div className="ai-chat-page__message-content">
                                 {message.role === "assistant" ? (
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -430,7 +443,7 @@ function AIChat({ initialDocument }) {
                                     <span>{message.content}</span>
                                 )}
                             </div>
-
+                            {/* SOURCES */}
                             {message.sources?.length > 0 && (
                                 <div className="ai-chat-page__sources">
                                     <strong>Sources</strong>
@@ -439,29 +452,29 @@ function AIChat({ initialDocument }) {
                                             {typeof source === "string"
                                                 ? source
                                                 : source.file_name ||
-                                                  source.name ||
-                                                  source.title ||
-                                                  `Source ${sourceIndex + 1}`}
+                                                source.name ||
+                                                source.title ||
+                                                `Source ${sourceIndex + 1}`}
                                         </span>
                                     ))}
                                 </div>
                             )}
                         </div>
                     ))}
-
+                    {/* LOADING INDICATOR  */}
                     {(loading || initialisingSession) && (
                         <div className="ai-chat-page__message ai-chat-page__message--assistant">
                             {initialisingSession ? "Preparing session..." : "Thinking..."}
                         </div>
                     )}
                 </div>
-
+                {/* ERROR MESSAGE */}
                 {error && (
                     <div className="ai-chat-page__error">
                         {error}
                     </div>
                 )}
-
+                {/* QUESTION FORM  */}
                 <form className="ai-chat-page__form" onSubmit={sendQuestion}>
                     <input
                         type="text"

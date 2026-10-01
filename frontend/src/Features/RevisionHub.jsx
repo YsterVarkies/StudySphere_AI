@@ -1,12 +1,18 @@
-import { useEffect, useState } from "react";
-import "./RevisionHub.css";
+import {  useEffect, useState } from "react";  // React hooks, useState- stores changing data and useEffect- run code when things happen, like the component first loads.
+import "./RevisionHub.css"; // imports the CSS file for this component
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "http://localhost:5000/api"; // base URL for Backend API
 
+
+/* Session Helpers */
+
+// Read the user's saved login/session information
 function getSession() {
     try {
+        // data stored as strings
         const raw = localStorage.getItem("studysphere_session");
 
+        // if ther is no saved session, return an empty session
         if (!raw) {
             return {
                 token: "",
@@ -14,8 +20,12 @@ function getSession() {
             };
         }
 
+        // Convert the JSON string back into a JavaScript object
         const session = JSON.parse(raw);
 
+        //return only the needed information
+        // ||-Fallback value
+        // ?-optional chaining
         return {
             token: session?.token || "",
             user: session?.user || null,
@@ -29,43 +39,49 @@ function getSession() {
         };
     }
 }
-
+//Get the user's ID from the session
 function getUserId() {
     return getSession()?.user?.user_id || "";
 }
-
+//Get the authentication token from the session
 function getToken() {
     return getSession()?.token || "";
 }
 
+/* Main Component */
 function RevisionHub() {
-    const [documents, setDocuments] = useState([]);
-    const [selectedDocument, setSelectedDocument] = useState("");
-    const [number, setNumber] = useState(5);
-    const [difficulty, setDifficulty] = useState("medium");
-    const [mode, setMode] = useState(null);
-    const [content, setContent] = useState(null);
-    const [currentQuestion, setCurrentQuestion] = useState(0);
-    const [selectedAnswer, setSelectedAnswer] = useState({});
-    const [showAnswer, setShowAnswer] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
 
+    //State
+    const [documents, setDocuments] = useState([]); //Stores document loaded from backend
+    const [selectedDocument, setSelectedDocument] = useState(""); //Stores ID of document selected in the dropdown 
+    const [number, setNumber] = useState(5); // number questions/cards the user wants 
+    const [difficulty, setDifficulty] = useState("medium"); //selected difficulty
+    const [mode, setMode] = useState(null); // stores the type of revision quiz/ flashcard
+    const [content, setContent] = useState(null); // stores quiz/flashcard data returned by the backend 
+    const [currentQuestion, setCurrentQuestion] = useState(0); //keep track of question/card the user is viewing 
+    const [selectedAnswer, setSelectedAnswer] = useState({}); //stores the answers
+    const [showAnswer, setShowAnswer] = useState(false); //controls whether the answer should be displayed
+    const [loading, setLoading] = useState(false); //used while API request is running. true = currently loading, false = not loading
+    const [error, setError] = useState(""); //stores an error message 
+
+    /* Load Documents when Component Starts */
     useEffect(() => {
-        loadDocuments();
+        loadDocuments(); //when user opens RevisionHub load the documents.
     }, []);
 
+    /* Load Documents From Backend */
     async function loadDocuments() {
         try {
-            setError("");
+            setError(""); // clear previous error
 
+            // get information from the logged-in session
             const userId = getUserId();
             const token = getToken();
             const response = await fetch(
                 `${API_URL}/documents${userId ? `?userid=${encodeURIComponent(userId)}` : ""}`,
                 {
                     headers: {
-                        Authorization: token ? `Bearer ${token}` : "",
+                        Authorization: token ? `Bearer ${token}` : "", // send the authentication token to the backend 
                     },
                 }
             );
@@ -74,14 +90,16 @@ function RevisionHub() {
                 throw new Error(`Could not load documents (${response.status})`);
             }
 
+            //convert the JSON response from the backend into a JavaScript object 
             const data = await response.json();
 
+            //different backend response formats
             const list =
                 data.documents ||
                 data.data ||
                 (Array.isArray(data) ? data : []);
 
-            setDocuments(list);
+            setDocuments(list); // store the documents in React state
         } catch (error) {
             console.error("Load documents error:", error);
 
@@ -89,10 +107,13 @@ function RevisionHub() {
         }
     }
 
+    /* Document Helper Functions */
+
     function getDocumentId(document) {
         return document.document_id || document.id;
     }
 
+    //Gets document's display name 
     function getDocumentName(document) {
         return (
             document.name ||
@@ -103,6 +124,7 @@ function RevisionHub() {
         );
     }
 
+    //Gets module ID associated with the document
     function getDocumentModuleId(document) {
         return (
             document.module_id ||
@@ -110,46 +132,53 @@ function RevisionHub() {
         );
     }
 
+    // Find the document object that match ID selected 
     function getSelectedDocument() {
         return documents.find(
             (document) => String(getDocumentId(document)) === String(selectedDocument)
         );
     }
 
+    /* Generate Quiz or flashcards */
     async function generate(type) {
-        setError("");
+        setError(""); //clear error 
 
+        // make sure the user selects a document 
         if (!selectedDocument) {
             setError("Please select a document.");
             return;
         }
-        const document = getSelectedDocument();
+        const document = getSelectedDocument(); // find the document object 
 
+        // the ID selected does not match a document
         if (!document) {
             setError("The selected document could not be found.");
             return;
         }
+        //get document ID and module ID 
         const documentId = getDocumentId(document);
-
         const moduleId = getDocumentModuleId(document);
 
+        // check if the document has an ID
         if (!documentId) {
             setError("The selected document does not have a document ID.");
             return;
         }
-
+        // check is document has a module ID 
         if (!moduleId) {
             setError("The selected document does not have a module ID.");
             return;
         }
-
+        // convert number input into JavaScript number 
         const requestedNumber = Number(number);
 
+        // check if the number is valid whole number 
         if (!Number.isInteger(requestedNumber) || requestedNumber < 1) {
             setError("Please enter a valid number greater than 0.");
             return;
         }
 
+        /* Prepare UI For Generation */
         setLoading(true);
         setContent(null);
         setMode(type);
@@ -157,6 +186,7 @@ function RevisionHub() {
         setSelectedAnswer({});
         setShowAnswer(false);
 
+        /* Choose API Endpoint */
         const endpoint =
             type === "quiz"
                 ? `${API_URL}/quizzes/generate`
@@ -165,6 +195,7 @@ function RevisionHub() {
         try {
             const token = getToken();
 
+            /* Create Request Body */
             const requestBody = type === "quiz" ? {
                 userId: getUserId(),
                 documentId: Number(documentId),
@@ -181,21 +212,24 @@ function RevisionHub() {
                     difficulty: difficulty,
                     title: `Flashcards - ${getDocumentName(document)}`,
                 };
+
             console.log(`Generating ${type}:`, requestBody);
 
+            /* Send Request to backend */
             const response = await fetch(endpoint, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: token ? `Bearer ${token}` : "",
                 },
-                body: JSON.stringify(requestBody),
+                body: JSON.stringify(requestBody), //convert object into JSON text
             });
 
-            const data = await response.json().catch(() => ({}));
+            const data = await response.json().catch(() => ({})); //read the JSON response
 
             console.log(`${type} response:`, data);
 
+            /* Handle HTTP Errors */
             if (!response.ok) {
                 if (response.status === 502) {
                     throw new Error(
@@ -214,6 +248,7 @@ function RevisionHub() {
                 );
             }
 
+            /* Find Generated Content */
             const generated =
                 data.data ||
                 data.quiz ||
@@ -222,7 +257,7 @@ function RevisionHub() {
                 data.cards ||
                 data;
 
-            setContent(generated);
+            setContent(generated); // store content in React state
         } catch (error) {
             console.error(`Generate ${type} error:`, error);
             setContent(null);
@@ -235,6 +270,7 @@ function RevisionHub() {
         }
     }
 
+    /* Extract Quiz Questions */
     function getQuestions() {
         if (Array.isArray(content)) return content;
         if (content?.questions) return content.questions;
@@ -243,6 +279,7 @@ function RevisionHub() {
         return [];
     }
 
+    /* Extract Flashcards */
     function getCards() {
         if (Array.isArray(content)) {
             return content;
@@ -266,11 +303,15 @@ function RevisionHub() {
         return [];
     }
 
+    /* Current Content */
     const questions = getQuestions();
     const cards = getCards();
     const currentQuizQuestion = questions[currentQuestion];
     const currentCard = cards[currentQuestion];
 
+    /* Quiz Helper Functions */
+
+    // Get hte text of a question
     function getQuestionText(question) {
         return (
             question?.question ||
@@ -280,6 +321,7 @@ function RevisionHub() {
         );
     }
 
+    // Get the answer options
     function getQuestionOptions(question) {
         return (
             question?.options ||
@@ -289,6 +331,7 @@ function RevisionHub() {
         );
     }
 
+    // Get correct answer vlaue
     function getCorrectAnswer(question) {
         return (
             question?.correct_answer ||
@@ -299,6 +342,7 @@ function RevisionHub() {
         );
     }
 
+    // Convert option into text
     function getOptionText(option) {
         if (typeof option === "string") {
             return option;
@@ -312,6 +356,7 @@ function RevisionHub() {
         );
     }
 
+    /*  Convert A/B/C/D into an Array index */
     function getCorrectOptionIndex(question) {
         const correctAnswer = getCorrectAnswer(question);
 
@@ -328,6 +373,7 @@ function RevisionHub() {
         return answer.charCodeAt(0) - "A".charCodeAt(0);
     }
 
+    // Get the actual option that is correct
     function getCorrectOption(question) {
         const options = getQuestionOptions(question);
         const correctIndex = getCorrectOptionIndex(question);
@@ -338,11 +384,14 @@ function RevisionHub() {
         return options[correctIndex];
     }
 
+
+    // check selected option is correct
     function isAnswerCorrect(question, optionIndex) {
         return optionIndex === getCorrectOptionIndex(question);
     }
-        
 
+
+    /* Quiz Navigation */
     function nextQuestion() {
         if (currentQuestion < questions.length - 1) {
             setCurrentQuestion((current) => current + 1);
@@ -357,6 +406,7 @@ function RevisionHub() {
         }
     }
 
+    /* Flashcard Navigation */
     function nextCard() {
         if (currentQuestion < cards.length - 1) {
             setCurrentQuestion((current) => current + 1);
@@ -371,6 +421,7 @@ function RevisionHub() {
         }
     }
 
+    /* Reset Revision Content */
     function resetRevisionContent() {
         setContent(null);
         setMode(null);
@@ -380,14 +431,17 @@ function RevisionHub() {
         setError("");
     }
 
+    /* USER Interface */
     return (
         <main className="revision-hub-page">
+            {/* PAGE HEADING */}
             <header className="revision-hub-page__header">
                 <h1>Revision Hub</h1>
                 <p>Generate quizzes and flashcards from your study materials.</p>
             </header>
-
+            {/* CONTROLS */}
             <section className="revision-hub-page__controls">
+                {/* DOCUMENT SELECTOR */}
                 <label>Study Materials
                     <select
                         value={selectedDocument}
@@ -414,7 +468,7 @@ function RevisionHub() {
                         })}
                     </select>
                 </label>
-
+                {/* NUMBER INPUT */}
                 <label>
                     Number
 
@@ -428,7 +482,7 @@ function RevisionHub() {
                         }}
                     />
                 </label>
-
+                {/* DIFFICULTY */}
                 <label>
                     Difficulty
 
@@ -449,8 +503,9 @@ function RevisionHub() {
                         </option>
                     </select>
                 </label>
-
+                {/* GENERATE BUTTONS */}
                 <div className="revision-hub-page__buttons">
+                    {/* QUIZ BUTTON */}
                     <button
                         type="button"
                         onClick={() => generate("quiz")}
@@ -462,7 +517,7 @@ function RevisionHub() {
                                 : "Generate Quiz"
                         }
                     </button>
-
+                    {/* FLASHCARD BUTTON */}
                     <button
                         type="button"
                         onClick={() => generate("flashcards")}
@@ -476,13 +531,13 @@ function RevisionHub() {
                     </button>
                 </div>
             </section>
-
+            {/* ERROR MESSAGE */}
             {error && (
                 <div className="revision-hub-page__error">
                     {error}
                 </div>
             )}
-
+            {/* QUIZ */}
             {mode === "quiz" && questions.length > 0 && currentQuizQuestion && (
                 <section className="revision-hub-page__content">
                     <div className="revision-hub-page__quiz-header">
@@ -511,12 +566,12 @@ function RevisionHub() {
                             }}
                         />
                     </div>
-
+                    {/* QUESTION */}
                     <article className="revision-hub-page__question">
                         <h3>
                             {getQuestionText(currentQuizQuestion)}
                         </h3>
-
+                        {/* ANSWER OPTIONS */}
                         <div>
                             {getQuestionOptions(currentQuizQuestion).map((option, optionIndex) => {
                                 const value = getOptionText(option);
@@ -567,7 +622,7 @@ function RevisionHub() {
                                 This question does not have multiple-choice options.
                             </p>
                         )}
-
+                        {/* SHOW CORRECT ANSWER */}
                         {showAnswer && (
                             <div className="revision-hub-page__correct-answer" >
                                 <strong>Answer</strong>
@@ -577,7 +632,7 @@ function RevisionHub() {
                             </div>
                         )}
                     </article>
-
+                    {/* QUIZ NAVIGATION */}
                     <div className="revision-hub-page__quiz-actions" >
                         <button
                             type="button"
@@ -587,7 +642,7 @@ function RevisionHub() {
                         >
                             Previous
                         </button>
-
+                        {/* TOGGLE ANSWER BETWEEN VISIBLE AND HIDDEN */}
                         <button
                             type="button"
                             className="revision-hub-page__answer-button"
@@ -614,7 +669,7 @@ function RevisionHub() {
                     </div>
                 </section>
             )}
-
+            {/* FLASHCARDS */}
             {mode === "flashcards" && cards.length > 0 && currentCard && (
                 <section className="revision-hub-page__flashcards">
                     <div className="revision-hub-page__flashcards-header">
@@ -625,7 +680,7 @@ function RevisionHub() {
 
                         <span> Card {currentQuestion + 1} of {" "} {cards.length} </span>
                     </div>
-
+                    {/* FLASHCARD PROGRESS */}
                     <div className="revision-hub-page__progress">
                         <div className="revision-hub-page__progress-bar"
                             style={{
@@ -633,7 +688,7 @@ function RevisionHub() {
                             }}
                         />
                     </div>
-
+                    {/* FLASHCARD */}
                     <button
                         type="button"
                         className="revision-hub-page__flashcard"
@@ -662,6 +717,8 @@ function RevisionHub() {
                                 : "Click to reveal the answer"}
                         </small>
                     </button>
+
+                    {/* FLASHCARD NAVIGATION */}
                     <div className="revision-hub-page__flashcard-actions">
                         <button
                             type="button"
@@ -683,6 +740,7 @@ function RevisionHub() {
                     </div>
                 </section>
             )}
+            {/* EMPTY STATE */}
             {!loading && mode && questions.length === 0 && cards.length === 0 && !error && (
                 <div className="revision-hub-page__empty">
                     No revision content was returned.
