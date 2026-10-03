@@ -342,6 +342,16 @@ function RevisionHub() {
         );
     }
 
+    //Get the Explanation of the answer
+    function getAnswerExplanation(question) {
+        return (
+            question?.explanation ||
+            question?.reason ||
+            question?.feedback ||
+            ""
+        );
+    }
+
     // Convert option into text
     function getOptionText(option) {
         if (typeof option === "string") {
@@ -622,12 +632,16 @@ function RevisionHub() {
                                 This question does not have multiple-choice options.
                             </p>
                         )}
-                        {/* SHOW CORRECT ANSWER */}
+                        {/* SHOW CORRECT ANSWER AND EXPLANATION */}
                         {showAnswer && (
                             <div className="revision-hub-page__correct-answer" >
                                 <strong>Answer</strong>
                                 <p>
                                     {getOptionText(getCorrectOption(currentQuizQuestion)) || "The correct answer is unavailable."}
+                                </p>
+                                <strong>Explanation</strong>
+                                <p>
+                                    {getAnswerExplanation(currentQuizQuestion) || "No explanation available."}
                                 </p>
                             </div>
                         )}
