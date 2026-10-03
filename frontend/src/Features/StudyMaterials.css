@@ -92,8 +92,9 @@
 
 .study-materials-page__documents {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
+  align-items: stretch;
 }
 
 .study-materials-page__document {
@@ -104,7 +105,13 @@
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   padding: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  min-height: 165px;
+  box-shadow: 0 2px 6px rgba(10, 32, 61, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.study-materials-page__document:hover {
+  box-shadow: 0 6px 16px rgba(10, 32, 61, 0.8);
+  transform: translateY(-2px);
 }
 
 .study-materials-page__document-header-row {
@@ -131,6 +138,11 @@
   word-break: break-word;
 }
 
+.study-materials-page__document-info  {
+  flex: 1;
+  min-width: 0;
+}
+
 .study-materials-page__document-info p {
   margin: 0;
   color: #64748b;
@@ -139,57 +151,61 @@
 
 
 .study-materials-page__chat-btn {
-  padding: 10px;
+  padding: 10px 12px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   color: #0a203d;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: opacity 0.2s;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .study-materials-page__chat-btn:hover {
   background: #f8fafc;
+  border-color: #94a3b8;
+
 }
 
 .study-materials-page__document-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 10px;
+  margin-top: 18px;
   width: 100%;
 }
 
 .study-materials-page__document-actions button {
   flex: 1;
+  min-width: 0;
   height: 42px;
   margin-top: 0;
   box-sizing: border-box;
+  white-space: nowrap;
 }
 
 .study-materials-page__open-btn {
-  padding: 10px;
+  padding: 10px 12px;
   background: #e07a19;
   border: 1px solid #e07a19;
   border-radius: 8px;
   color: #ffffff;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: opacity 0.2s;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .study-materials-page__open-btn:hover {
-  opacity: 0.9;
+  background: #c96b13;
 }
 
 .study-materials-page__dropzone-card {
@@ -200,15 +216,17 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 30px;
+  padding: 30px 20px;
   text-align: center;
   cursor: pointer;
-  min-height: 140px;
-  transition: border-color 0.2s;
+  min-height: 160px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .study-materials-page__dropzone-card:hover {
   border-color: #e07a19;
+  background: #fffaf5;
 }
 
 .study-materials-page__dropzone-icon {
