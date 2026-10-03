@@ -6,6 +6,12 @@ export default function ModulesAndCohorts() {
   const [data, setData] = useState({ modules: [], cohorts: [] });
   const [loading, setLoading] = useState(true);
   
+  // Check if current user is a student
+  const sessionStr = localStorage.getItem('studysphere_session');
+  const session = sessionStr ? JSON.parse(sessionStr) : {};
+  const userRole = session?.user?.role || 'student';
+  const isStudent = userRole.toLowerCase() === 'student';
+
   // Modal states
   const [isModuleModalOpen, setIsModuleModalOpen] = useState(false);
   const [isCohortModalOpen, setIsCohortModalOpen] = useState(false);
@@ -34,9 +40,14 @@ export default function ModulesAndCohorts() {
   }
 
   useEffect(() => {
+    if (isStudent) {
+      // If student, keep lists empty and stop loading
+      setData({ modules: [], cohorts: [] });
+      setLoading(false);
+      return;
+    }
     fetchModulesAndCohorts();
-  }, []);
-
+  }, [isStudent]);
   function fetchModulesAndCohorts() {
     Promise.all([
       fetch(`${API_URL}/modules`, { headers: { ...getAuthHeader() } }).then(res => res.json()),

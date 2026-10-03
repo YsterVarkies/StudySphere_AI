@@ -79,7 +79,7 @@ const cohortRoutes = require("./routes/cohort.routes");
 
 app.use("/api/analytics", authenticateToken, requireRole("admin"), analyticsRoutes);
 app.use("/api/users", authenticateToken, requireRole("admin"), userRoutes);
-app.use("/api/modules", authenticateToken, requireRole("admin"), moduleRoutes);
+app.use("/api/modules", moduleRoutes);
 app.use("/api/cohorts", authenticateToken, requireRole("admin"), cohortRoutes);
 
 //End Admin Code
