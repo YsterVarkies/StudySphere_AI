@@ -46,7 +46,6 @@ function getToken() {
 /* MAIN COMPONENT */
 function AIChat({ initialDocument }) {
     const initialDocumentId = initialDocument ? initialDocument.document_id || initialDocument.id : null;
-    const initialisedDocumentRef = useRef(null);
     const sessionInitialisingRef = useRef(false);
     const [documents, setDocuments] = useState([]);
     const [selectedDocuments, setSelectedDocuments] = useState(initialDocumentId ? [initialDocumentId] : []);
@@ -83,38 +82,11 @@ function AIChat({ initialDocument }) {
      * chat session for that docuement.
      */
     useEffect(() => {
-        if (selectedDocuments.length === 0) {
-            setSessionId(null);
-            setMessages([]);
-            initialisedDocumentRef.current = null;
-            return;
-        }
+        setSessionId(null);
+        setMessages([]);
+        setError("");
+        }, [selectedDocuments]);
 
-        // Wait until the document list has loaded,
-        // unless the initial document already contains its module ID.
-        if (
-            documents.length === 0 &&
-            !initialDocument?.module_id &&
-            !initialDocument?.moduleId
-        ) {
-            return;
-        }
-
-        const documentId = selectedDocuments[0];
-
-        //don't initialise another session for the same document.
-        if (initialisedDocumentRef.current === documentId) {
-            return;
-        }
-
-        //don't start another session while one is already being created.
-        if (sessionInitialisingRef.current) {
-            return;
-        }
-
-        initialisedDocumentRef.current = documentId;
-        initialiseSession();
-    }, [selectedDocuments, documents, initialDocument]);
 
     /* LOAD DOCUMENTS */
     async function loadDocuments() {
@@ -172,33 +144,24 @@ function AIChat({ initialDocument }) {
      * Create a new chat session and return the session id. 
      */
     async function initialiseSession() {
-        if (selectedDocuments.length === 0) {
-            return null;
-        }
-
+        
         if (sessionInitialisingRef.current) {
             return null;
         }
 
-        const documentId = selectedDocuments[0];
+        const documentId = selectedDocuments.length > 0 ? selectedDocuments[0] : null;
 
-        const selectedDocument = documents.find(
-            (document) => String(getDocumentId(document)) === String(documentId)
-        );
+        const selectedDocument = documentId ? documents.find((document) => String(getDocumentId(document)) === String(documentId)) : null;
         /**
          * when opened directly from studyMaterials, the 
          * initialDocument already contains module_id.
          */
-        const moduleId =
-            selectedDocument?.module_id ||
-            selectedDocument?.moduleId ||
-            initialDocument?.module_id ||
-            initialDocument?.moduleId;
+        const moduleId = documentId ? (selectedDocument?.module_id || selectedDocument?.moduleId || initialDocument?.module_id || initialDocument?.moduleId || null) : null;
 
-        if (!moduleId) {
-            setError("The selected document does not have a module ID.");
+       if (documentId && !moduleId) {
+            setError("Could not determine the module for the selected document.");
             return null;
-        }
+       }
 
         sessionInitialisingRef.current = true;
         try {
@@ -217,9 +180,11 @@ function AIChat({ initialDocument }) {
                     },
                     body: JSON.stringify({
                         userId: userId,
-                        moduleId: Number(moduleId),
-                        documentId: Number(documentId),
-                        title: `Study Session - ${getDocumentName(selectedDocument || initialDocument || {})}`,
+                        moduleId: moduleId ? Number(moduleId) : null,
+                        documentId: documentId ? Number(documentId) : null,
+                        title: documentId
+                            ? `Study Session - ${getDocumentName(selectedDocument || initialDocument || {})}`
+                            : "General AI Chat Session",
                     }),
                 }
             );
@@ -241,11 +206,6 @@ function AIChat({ initialDocument }) {
                 throw new Error("The server created a chat session but did not return its ID.");
             }
             setSessionId(newSessionId);
-
-            /**
-             * start a fresh conversation whenever the document changes.
-             */
-            setMessages([]);
 
             return newSessionId;
         } catch (error) {
@@ -277,11 +237,6 @@ function AIChat({ initialDocument }) {
         event.preventDefault();
 
         if (!question.trim() || loading) {
-            return;
-        }
-
-        if (selectedDocuments.length === 0) {
-            setError("Please select a document first.");
             return;
         }
 
@@ -483,7 +438,7 @@ function AIChat({ initialDocument }) {
                         placeholder="Ask a question..."
                         disabled={loading || initialisingSession}
                     />
-                    <button type="submit" disabled={loading || initialisingSession || !question.trim() || selectedDocuments.length === 0}>
+                    <button type="submit" disabled={loading || initialisingSession || !question.trim()}>
                         {loading ? "Sending..." : "Send"}
                     </button>
                 </form>
