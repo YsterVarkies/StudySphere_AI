@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ export default function UserManagement() {
   }, []);
 
   function fetchUsers() {
-    fetch('http://localhost:5000/api/users', {
+    fetch(`${API_URL}/users`, {
       headers: { ...getAuthHeader() }
     })
       .then((res) => {
@@ -40,7 +42,7 @@ export default function UserManagement() {
       })
       .then((data) => {
         const userList = Array.isArray(data) ? data : (data.users || data.data || data.items || []);
-        setUsers(userList);
+        setUsers(userList.filter(Boolean)); // Filter out any null/undefined entries
         setLoading(false);
       })
       .catch((err) => {
@@ -50,18 +52,20 @@ export default function UserManagement() {
   }
 
   function handleOpenEdit(user) {
+    if (!user) return;
     setEditingUser(user);
-    setNewName(user.name);
-    setNewEmail(user.email);
-    setNewRole(user.role);
+    setNewName(user.name || '');
+    setNewEmail(user.email || '');
+    setNewRole(user.role || 'Student');
     setIsModalOpen(true);
   }
 
   function handleSaveUser(e) {
     e.preventDefault();
-    if (!newName.trim() || !newEmail.trim() || !editingUser) return;
+    const targetId = editingUser?.user_id || editingUser?.id;
+    if (!newName.trim() || !newEmail.trim() || !targetId) return;
 
-    const url = `http://localhost:5000/api/users/${editingUser.id}`;
+    const url = `${API_URL}/users/${targetId}`;
 
     fetch(url, {
       method: 'PUT',
@@ -91,22 +95,29 @@ export default function UserManagement() {
       .catch((err) => console.error('Error updating user:', err));
   }
 
-  function handleDeleteUser(id) {
+ function handleDeleteUser(user) {
+    const targetId = user?.user_id || user?.id;
+    if (!targetId) return;
+    
     if (!window.confirm('Are you sure you want to delete this user?')) return;
 
-    fetch(`http://localhost:5000/api/users/${id}`, {
+    fetch(`${API_URL}/users/${targetId}`, {
       method: 'DELETE',
-      headers: { ...getAuthHeader() }
+      headers: { 
+        ...getAuthHeader() 
+      }
     })
       .then((res) => {
         if (!res.ok) throw new Error('Failed to delete user');
-        setUsers(users.filter((u) => u.id !== id));
+        // Instantly remove the deleted user from the frontend state list
+        setUsers(users.filter((u) => (u?.user_id || u?.id) !== targetId));
       })
       .catch((err) => console.error('Error deleting user:', err));
   }
 
-  // Filter users based on search query and role filter selection
+  // Filter users safely
   const filteredUsers = users.filter((user) => {
+    if (!user) return false;
     const matchesSearch = 
       (user.name && user.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -171,16 +182,16 @@ export default function UserManagement() {
           <tbody>
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user, index) => (
-                <tr key={user.id || index} style={{ borderBottom: index < filteredUsers.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                  <td style={{ padding: '16px 0', fontWeight: 500, color: '#334155' }}>{user.name}</td>
-                  <td style={{ padding: '16px 0', color: '#475569' }}>{user.email}</td>
+                <tr key={user?.user_id || user?.id || index} style={{ borderBottom: index < filteredUsers.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                  <td style={{ padding: '16px 0', fontWeight: 500, color: '#334155' }}>{user?.name || 'Unknown'}</td>
+                  <td style={{ padding: '16px 0', color: '#475569' }}>{user?.email || 'N/A'}</td>
                   <td style={{ padding: '16px 0', color: '#334155' }}>
-                    <span style={{ padding: '2px 8px', background: user.role === 'Administrator' ? '#e0f2fe' : '#f1f5f9', color: user.role === 'Administrator' ? '#0369a1' : '#475569', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
-                      {user.role}
+                    <span style={{ padding: '2px 8px', background: user?.role === 'Administrator' ? '#e0f2fe' : '#f1f5f9', color: user?.role === 'Administrator' ? '#0369a1' : '#475569', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                      {user?.role || 'Student'}
                     </span>
                   </td>
-                  <td style={{ padding: '16px 0', color: user.status === 'Active' ? '#059669' : '#94a3b8', fontWeight: 500 }}>
-                    {user.status || 'Active'}
+                  <td style={{ padding: '16px 0', color: user?.status === 'Active' ? '#059669' : '#94a3b8', fontWeight: 500 }}>
+                    {user?.status || 'Active'}
                   </td>
                   <td style={{ padding: '16px 0', textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
@@ -193,7 +204,7 @@ export default function UserManagement() {
                       </button>
                       <button 
                         type="button" 
-                        onClick={() => handleDeleteUser(user.id)} 
+                        onClick={() => handleDeleteUser(user)} 
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.875rem', fontWeight: 500 }}
                       >
                         Delete

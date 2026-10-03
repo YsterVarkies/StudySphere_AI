@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
+const session = JSON.parse(localStorage.getItem('studysphere_session') || '{}');
+const token = session?.token;
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 // Default empty/zero state to prevent flashing mock data
 const initialStats = {
   activeUsers: 0,
@@ -28,7 +32,7 @@ export default function AnalyticsDashboard() {
   }
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/analytics', {
+    fetch(`${API_URL}/analytics`, {
       headers: { ...getAuthHeader() }
     })
       .then((res) => {

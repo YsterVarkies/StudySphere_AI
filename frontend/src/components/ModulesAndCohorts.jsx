@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 export default function ModulesAndCohorts() {
   const [data, setData] = useState({ modules: [], cohorts: [] });
   const [loading, setLoading] = useState(true);
@@ -8,11 +10,11 @@ export default function ModulesAndCohorts() {
   const [isModuleModalOpen, setIsModuleModalOpen] = useState(false);
   const [isCohortModalOpen, setIsCohortModalOpen] = useState(false);
   
-  // Edit tracking states
-  const [editingModuleCode, setEditingModuleCode] = useState(null);
+  // Edit tracking states (storing IDs/codes)
+  const [editingModuleId, setEditingModuleId] = useState(null);
   const [editingCohortId, setEditingCohortId] = useState(null);
 
-  // Form states
+  // Form states matching inputs
   const [newCode, setNewCode] = useState('');
   const [newName, setNewName] = useState('');
   const [newCohortName, setNewCohortName] = useState('');
@@ -36,17 +38,17 @@ export default function ModulesAndCohorts() {
   }, []);
 
   function fetchModulesAndCohorts() {
-    fetch('http://localhost:5000/api/modules', {
-      headers: { ...getAuthHeader() }
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to fetch data');
-        return res.json();
-      })
-      .then((result) => {
+    Promise.all([
+      fetch(`${API_URL}/modules`, { headers: { ...getAuthHeader() } }).then(res => res.json()),
+      fetch(`${API_URL}/cohorts`, { headers: { ...getAuthHeader() } }).then(res => res.json())
+    ])
+      .then(([modulesResult, cohortsResult]) => {
+        const moduleList = modulesResult.modules || modulesResult;
+        const cohortList = cohortsResult.cohorts || cohortsResult;
+
         setData({
-          modules: Array.isArray(result.modules) ? result.modules : [],
-          cohorts: Array.isArray(result.cohorts) ? result.cohorts : []
+          modules: Array.isArray(moduleList) ? moduleList : [],
+          cohorts: Array.isArray(cohortList) ? cohortList : []
         });
         setLoading(false);
       })
@@ -56,16 +58,13 @@ export default function ModulesAndCohorts() {
       });
   }
 
-  // Handle Create or Update Module
   function handleSaveModule(e) {
     e.preventDefault();
-    if (!newCode.trim() || !newName.trim()) return;
-
-    const url = editingModuleCode 
-      ? `http://localhost:5000/api/modules/${editingModuleCode}` 
-      : 'http://localhost:5000/api/modules';
     
-    const method = editingModuleCode ? 'PUT' : 'POST';
+    // Check if we are updating or creating
+    const isEditing = Boolean(editingModuleId);
+    const url = isEditing ? `${API_URL}/modules/${editingModuleId}` : `${API_URL}/modules`;
+    const method = isEditing ? 'PUT' : 'POST';
 
     fetch(url, {
       method: method,
@@ -73,10 +72,10 @@ export default function ModulesAndCohorts() {
         'Content-Type': 'application/json',
         ...getAuthHeader() 
       },
-      body: JSON.stringify({
-        code: newCode.trim().toUpperCase(),
-        name: newName.trim(),
-        description: 'Standard module description'
+      body: JSON.stringify({ 
+        module_code: newCode, 
+        module_name: newName,
+        module_id: editingModuleId 
       })
     })
       .then((res) => {
@@ -90,16 +89,12 @@ export default function ModulesAndCohorts() {
       .catch((err) => console.error('Error saving module:', err));
   }
 
-  // Handle Create or Update Cohort
   function handleSaveCohort(e) {
     e.preventDefault();
-    if (!newCohortName.trim()) return;
-
-    const url = editingCohortId 
-      ? `http://localhost:5000/api/cohorts/${editingCohortId}` 
-      : 'http://localhost:5000/api/cohorts';
     
-    const method = editingCohortId ? 'PUT' : 'POST';
+    const isEditing = Boolean(editingCohortId);
+    const url = isEditing ? `${API_URL}/cohorts/${editingCohortId}` : `${API_URL}/cohorts`;
+    const method = isEditing ? 'PUT' : 'POST';
 
     fetch(url, {
       method: method,
@@ -107,9 +102,10 @@ export default function ModulesAndCohorts() {
         'Content-Type': 'application/json',
         ...getAuthHeader() 
       },
-      body: JSON.stringify({
-        name: newCohortName.trim(),
-        academicYear: parseInt(newAcademicYear, 10) || 2026
+      body: JSON.stringify({ 
+        cohort_name: newCohortName, 
+        academic_year: newAcademicYear,
+        cohort_id: editingCohortId
       })
     })
       .then((res) => {
@@ -124,23 +120,23 @@ export default function ModulesAndCohorts() {
   }
 
   function openEditModuleModal(mod) {
-    setEditingModuleCode(mod.code);
-    setNewCode(mod.code);
-    setNewName(mod.name);
+    setEditingModuleId(mod.module_id || mod.id);
+    setNewCode(mod.code || mod.module_code || '');
+    setNewName(mod.name || mod.module_name || '');
     setIsModuleModalOpen(true);
   }
 
   function closeModuleModal() {
-    setEditingModuleCode(null);
+    setEditingModuleId(null);
     setNewCode('');
     setNewName('');
     setIsModuleModalOpen(false);
   }
 
   function openEditCohortModal(cohort) {
-    setEditingCohortId(cohort.id);
-    setNewCohortName(cohort.name);
-    setNewAcademicYear(cohort.academicYear || '2026');
+    setEditingCohortId(cohort.cohort_id || cohort.id);
+    setNewCohortName(cohort.name || cohort.cohort_name || '');
+    setNewAcademicYear(cohort.academicYear || cohort.academic_year || '2026');
     setIsCohortModalOpen(true);
   }
 
@@ -151,24 +147,24 @@ export default function ModulesAndCohorts() {
     setIsCohortModalOpen(false);
   }
 
-  function handleDeleteModule(code) {
-    if (!window.confirm(`Are you sure you want to delete module ${code}?`)) return;
+  function handleDeleteModule(modId) {
+    if (!modId || !window.confirm('Are you sure you want to delete this module?')) return;
 
-    fetch(`http://localhost:5000/api/modules/${code}`, {
+    fetch(`${API_URL}/modules/${modId}`, {
       method: 'DELETE',
       headers: { ...getAuthHeader() }
     })
-      .then((res) => {
+      .then(res => {
         if (!res.ok) throw new Error('Failed to delete module');
         fetchModulesAndCohorts();
       })
-      .catch((err) => console.error('Error deleting module:', err));
+      .catch(err => console.error('Error deleting module:', err));
   }
 
-  function handleDeleteCohort(id) {
-    if (!window.confirm('Are you sure you want to delete this cohort?')) return;
+  function handleDeleteCohort(cohortId) {
+    if (!cohortId || !window.confirm('Are you sure you want to delete this cohort?')) return;
 
-    fetch(`http://localhost:5000/api/cohorts/${id}`, {
+    fetch(`${API_URL}/cohorts/${cohortId}`, {
       method: 'DELETE',
       headers: { ...getAuthHeader() }
     })
@@ -219,9 +215,9 @@ export default function ModulesAndCohorts() {
             </thead>
             <tbody>
               {data.modules.map((mod, index) => (
-                <tr key={mod.code || index} style={{ borderBottom: index < data.modules.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                  <td style={{ padding: '16px 0', fontWeight: 500, color: '#334155' }}>{mod.code}</td>
-                  <td style={{ padding: '16px 0', color: '#475569' }}>{mod.name}</td>
+                <tr key={mod.module_id || mod.code || index} style={{ borderBottom: index < data.modules.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                  <td style={{ padding: '16px 0', fontWeight: 500, color: '#334155' }}>{mod.code || mod.module_code}</td>
+                  <td style={{ padding: '16px 0', color: '#475569' }}>{mod.name || mod.module_name}</td>
                   <td style={{ padding: '16px 0', textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
                     <button 
                       onClick={() => openEditModuleModal(mod)}
@@ -230,7 +226,7 @@ export default function ModulesAndCohorts() {
                       Edit
                     </button>
                     <button 
-                      onClick={() => handleDeleteModule(mod.code)}
+                      onClick={() => handleDeleteModule(mod.module_id || mod.id)}
                       style={{ background: '#fee2e2', color: '#991b1b', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                     >
                       Delete
@@ -249,10 +245,10 @@ export default function ModulesAndCohorts() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {data.cohorts.map((cohort, index) => (
-              <div key={cohort.id || index} style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={cohort.cohort_id || cohort.id || index} style={{ padding: '14px 16px', background: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0f172a', marginBottom: '3px' }}>{cohort.name}</h3>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Academic Year: {cohort.academicYear || '2026'}</p>
+                  <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0f172a', marginBottom: '3px' }}>{cohort.name || cohort.cohort_name}</h3>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Academic Year: {cohort.academicYear || cohort.academic_year || '2026'}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button 
@@ -262,7 +258,7 @@ export default function ModulesAndCohorts() {
                     Edit
                   </button>
                   <button 
-                    onClick={() => handleDeleteCohort(cohort.id)}
+                    onClick={() => handleDeleteCohort(cohort.cohort_id || cohort.id)}
                     style={{ background: '#fee2e2', color: '#991b1b', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                   >
                     Delete
@@ -280,7 +276,7 @@ export default function ModulesAndCohorts() {
         <div className="task-modal-backdrop" role="presentation" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <form className="task-modal panel" onSubmit={handleSaveModule} style={{ background: '#fff', padding: '24px', borderRadius: '12px', width: '400px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
             <div className="task-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2>{editingModuleCode ? 'Edit module' : 'Create module'}</h2>
+              <h2>{editingModuleId ? 'Edit module' : 'Create module'}</h2>
               <button className="modal-close" type="button" onClick={closeModuleModal} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer' }}>×</button>
             </div>
 
@@ -297,7 +293,7 @@ export default function ModulesAndCohorts() {
 
             <div className="task-modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button className="modal-secondary-button" type="button" onClick={closeModuleModal} style={{ padding: '8px 16px', background: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
-              <button className="planner-button" type="submit" style={{ padding: '8px 16px', background: '#312e81', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{editingModuleCode ? 'Update module' : 'Save module'}</button>
+              <button className="planner-button" type="submit" style={{ padding: '8px 16px', background: '#312e81', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{editingModuleId ? 'Update module' : 'Save module'}</button>
             </div>
           </form>
         </div>
