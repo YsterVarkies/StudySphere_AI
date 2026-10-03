@@ -324,7 +324,7 @@ function AIChat({ initialDocument }) {
             });
             setQuestion(currentQuestion);
 
-            setError("The AI service is temporarily unavailable. Please try again in a moment.");
+            setError(error.message || "The AI service is temporarily unavailable. Please try again in a moment.");
         }
         finally {
             setLoading(false);
@@ -337,7 +337,7 @@ function AIChat({ initialDocument }) {
             {/* PAGE HEADER */}
             <header className="ai-chat-page__header">
                 <h1>AI Chat Assistant</h1>
-                <p>Ask questions about your selected study materials.</p>
+                <p>Ask a general question or select a study material for additional context.</p>
             </header>
             {/* DOCUMENT SELECTION */}
             <section className="ai-chat-page__documents">
