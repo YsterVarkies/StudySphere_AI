@@ -887,6 +887,8 @@ function App() {
   const todayTasks = sortTasksByDate(tasks.filter((task) => getTaskStatus(task) === 'today'))
   const pastTasks = sortTasksByDate(tasks.filter((task) => ['overdue', 'completed'].includes(getTaskStatus(task))))
 
+  
+  
   return (
     <div className="app-shell">
       <SuccessNotice message={successMessage} />

@@ -9,6 +9,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const { authenticateToken, requireRole } = require('./middleware/auth.middleware');
+
 // Test route
 app.get('/api/test-summary', (req, res) => {
   res.json({ message: 'Summary test route works' });
@@ -30,10 +32,23 @@ app.use('/api/quizzes', quizRoutes);
 const aiChatRoutes = require('./src/routes/aiChat.routes');
 app.use('/api/chat', aiChatRoutes);
 
-const analyticsRoutes = require('./src/routes/analytics.routes');
-app.use('/api/analytics', analyticsRoutes);
+//const analyticsRoutes = require('./src/routes/analytics.routes');
+//app.use('/api/analytics', analyticsRoutes);
 
-// Admin Frontend - Analytics (Strict Live Data, Zero Fallbacks)
+//Analytics routes
+const analyticsRoutes = require('./routes/analytics.routes');
+const moduleRoutes = require('./routes/module.routes');
+const cohortRoutes = require('./routes/cohort.routes');
+const userRoutes = require('./routes/user.routes');
+
+app.use('/api/analytics', authenticateToken, requireRole('admin'), analyticsRoutes);
+app.use('/api/modules', moduleRoutes); // module.routes.js handles public viewing vs admin editing internally
+app.use('/api/cohorts', authenticateToken, requireRole('admin'), cohortRoutes);
+app.use('/api/users', authenticateToken, requireRole('admin'), userRoutes);
+
+
+
+// Admin Frontend - Analytics 
 app.get('/api/analytics', async (req, res) => {
   try {
     const [userCountResult] = await db.query('SELECT COUNT(*) as count FROM USER');
@@ -51,7 +66,7 @@ app.get('/api/analytics', async (req, res) => {
       percentage: 100 - (index * 20)
     }));
 
-    // Replace this block in your app.get('/api/analytics', ...) route:
+   
     const [logs] = await db.query('SELECT * FROM USER_ACTIVITY_LOG ORDER BY created_at DESC LIMIT 5');
     const recentLogs = logs.map(l => ({
       type: l.action || l.activity_type || l.event_type || 'Activity',
