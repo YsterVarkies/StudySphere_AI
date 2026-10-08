@@ -1,9 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db"); 
+const {
+    authenticateToken,
+    requireRole
+} = require("../middleware/auth.middleware");
 
 // GET /api/analytics - Fetch live summary analytics & dynamic growth from Aiven DB
-router.get("/", async (req, res) => {
+router.get(
+    "/",
+    authenticateToken,
+    requireRole("admin"),
+    async (req, res) => {
     try {
         // 1. Fetch total active users count
         const [userCountResult] = await db.query("SELECT COUNT(*) AS total FROM USER");
