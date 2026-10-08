@@ -14,7 +14,7 @@ const {
     createModule
 } = require("../controllers/module.controller");
 
-router.get("/", authenticateToken, moduleController.getModules);
+router.get("/", authenticateToken, requireRole("admin"), moduleController.getModules);
 router.post("/", authenticateToken, requireRole("admin"), createModule);
 router.put('/:id', authenticateToken, requireRole("admin"), moduleController.updateModule);
 router.delete('/:id', authenticateToken, requireRole("admin"), moduleController.deleteModule);

@@ -19,6 +19,11 @@ const authenticateToken = (req, res, next) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (!['student', 'admin'].includes(decoded.role)) {
+            return res.status(403).json({
+                message: "Access denied. Your account role is missing or invalid."
+            });
+        }
         req.user = decoded;
         next();
 

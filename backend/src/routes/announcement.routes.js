@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const announcementController = require('../controllers/announcement.controller');
+const { authenticateToken, requireRole } = require('../../middleware/auth.middleware');
 
-// Auth currently disabled for testing
+router.use(authenticateToken, requireRole('admin'));
 
 router.post('/', announcementController.createAnnouncement);
 router.get('/', announcementController.getAnnouncements);
