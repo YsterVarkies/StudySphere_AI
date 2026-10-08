@@ -1,13 +1,10 @@
+
 const express = require('express');
 
 const router = express.Router();
 
 const announcementController = require('../controllers/announcement.controller');
-
-const {
-    authenticateToken,
-    requireRole
-} = require("../../middleware/auth.middleware");
+const { authenticateToken, requireRole } = require('../../middleware/auth.middleware');
 
 // All announcement routes require the user to be logged in
 router.use(authenticateToken);

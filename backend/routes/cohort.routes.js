@@ -8,7 +8,7 @@ const {
     requireRole
 } = require("../middleware/auth.middleware");
 
-router.get("/", authenticateToken, cohortController.getCohorts);
+router.get("/", authenticateToken, requireRole("admin"), cohortController.getCohorts);
 router.post("/", authenticateToken, requireRole("admin"), cohortController.createCohort);
 router.put('/:id', authenticateToken, requireRole("admin"), cohortController.updateCohort);
 router.delete('/:id', authenticateToken, requireRole("admin"), cohortController.deleteCohort);
