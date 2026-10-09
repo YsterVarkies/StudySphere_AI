@@ -640,8 +640,8 @@ export function Registration({ onSignIn }) {
     email: '',
     password: '',
     confirmPassword: '',
-    programme: '',
-    yearOfStudy: '',
+    cohortId: '',
+    cohortSearch: '',
     role: '',
   })
   const [errors, setErrors] = useState({})
@@ -649,10 +649,53 @@ export function Registration({ onSignIn }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [cohorts, setCohorts] = useState([])
+  const [isLoadingCohorts, setIsLoadingCohorts] = useState(true)
+  const [cohortLoadError, setCohortLoadError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+
+    async function loadCohorts() {
+      try {
+        const response = await fetch(`${apiUrl}/cohorts/public`)
+        const result = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Unable to load cohorts.')
+        }
+
+        if (!cancelled) {
+          setCohorts(Array.isArray(result.cohorts) ? result.cohorts : [])
+          setCohortLoadError('')
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setCohortLoadError(error.message || 'Unable to load cohorts.')
+        }
+      } finally {
+        if (!cancelled) setIsLoadingCohorts(false)
+      }
+    }
+
+    loadCohorts()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function updateField(field, value) {
     setFormData((current) => ({ ...current, [field]: value }))
   }
+
+  const getCohortId = (cohort) => cohort.id ?? cohort.cohort_id
+  const getCohortName = (cohort) => cohort.name ?? cohort.cohort_name ?? ''
+  const getCohortYear = (cohort) => cohort.academicYear ?? cohort.academic_year ?? ''
+  const getCohortLabel = (cohort) => `${getCohortName(cohort)}${getCohortYear(cohort) ? ` (${getCohortYear(cohort)})` : ''}`
+  const filteredCohorts = cohorts.filter((cohort) => (
+    getCohortLabel(cohort).toLowerCase().includes(formData.cohortSearch.trim().toLowerCase())
+  ))
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -660,8 +703,8 @@ export function Registration({ onSignIn }) {
     const surname = formData.surname.trim()
     const studentNumber = formData.studentNumber.trim()
     const email = formData.email.trim().toLowerCase()
-    const yearOfStudy = formData.yearOfStudy.trim()
     const role = formData.role.trim().toLowerCase()
+    const cohortId = formData.cohortId
     const nextErrors = {}
     const namePattern = /^[\p{L}][\p{L}\s'-]*[\p{L}]$/u
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -679,8 +722,7 @@ export function Registration({ onSignIn }) {
     else if (!/[0-9]/.test(formData.password)) nextErrors.password = 'Password must contain at least one number.'
     if (!formData.confirmPassword) nextErrors.confirmPassword = 'Please confirm your password.'
     else if (formData.password !== formData.confirmPassword) nextErrors.confirmPassword = 'Passwords do not match.'
-    if (!yearOfStudy) nextErrors.yearOfStudy = 'Please select your year of study.'
-    else if (!Number.isInteger(Number(yearOfStudy))) nextErrors.yearOfStudy = 'Year of study must be a whole number.'
+    if (role === 'student' && !cohortId) nextErrors.cohortId = 'Please select your cohort.'
     if (!['student', 'administrator'].includes(role)) nextErrors.role = 'Please select a role.'
 
     setErrors(nextErrors)
@@ -695,7 +737,7 @@ export function Registration({ onSignIn }) {
         student_number: studentNumber,
         email,
         password: formData.password,
-        year_of_study: Number(yearOfStudy),
+        ...(cohortId ? { cohort_id: Number(cohortId) } : {}),
         role,
       })
       setSuccess(true)
@@ -706,7 +748,7 @@ export function Registration({ onSignIn }) {
         student_number: 'studentNumber',
         email: 'email',
         password: 'password',
-        year_of_study: 'yearOfStudy',
+        cohort_id: 'cohortId',
         role: 'role',
       }
       const formField = fieldMap[error.field]
@@ -746,8 +788,8 @@ export function Registration({ onSignIn }) {
         <div className="registration-grid">{inputFields.map(([field, label, type, autoComplete]) => <label className="login-field" key={field}>{label}<span className="login-input-wrap"><input type={type} value={formData[field]} onChange={(event) => updateField(field, event.target.value)} autoComplete={autoComplete} /></span>{errors[field] && <span className="login-error" role="alert">{errors[field]}</span>}</label>)}</div>
         <label className="login-field">Password<span className="login-input-wrap"><input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={(event) => updateField('password', event.target.value)} autoComplete="new-password" /><button className="password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label="Toggle password visibility">◉</button></span>{errors.password && <span className="login-error" role="alert">{errors.password}</span>}</label>
         <label className="login-field">Confirm password<span className="login-input-wrap"><input type={showConfirmPassword ? 'text' : 'password'} value={formData.confirmPassword} onChange={(event) => updateField('confirmPassword', event.target.value)} autoComplete="new-password" /><button className="password-toggle" type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label="Toggle confirmation password visibility">◉</button></span>{errors.confirmPassword && <span className="login-error" role="alert">{errors.confirmPassword}</span>}</label>
-        <div className="registration-grid optional-fields"><label className="login-field">Role<select required value={formData.role} onChange={(event) => updateField('role', event.target.value)}><option value="">Select role</option><option value="student">Student</option><option value="administrator">Administrator</option></select>{errors.role && <span className="login-error" role="alert">{errors.role}</span>}</label><label className="login-field">Course / Programme<input type="text" value={formData.programme} onChange={(event) => updateField('programme', event.target.value)} /></label><label className="login-field">Year of study<select value={formData.yearOfStudy} onChange={(event) => updateField('yearOfStudy', event.target.value)}><option value="">Select year</option><option>1</option><option>2</option><option>3</option><option value="4">4+</option></select>{errors.yearOfStudy && <span className="login-error" role="alert">{errors.yearOfStudy}</span>}</label></div>
-        {errors.form && <p className="login-error" role="alert">{errors.form}</p>}<button className="planner-button login-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Creating account...' : 'Register'}</button><p className="auth-switch">Already have an account? <button type="button" onClick={onSignIn}>Sign in</button></p><p className="login-footer">StudySphere · Student Portal</p>
+        <div className="registration-grid optional-fields"><label className="login-field">Role<select required value={formData.role} onChange={(event) => updateField('role', event.target.value)}><option value="">Select role</option><option value="student">Student</option><option value="administrator">Administrator</option></select>{errors.role && <span className="login-error" role="alert">{errors.role}</span>}</label><label className="login-field">Cohort<input type="text" list="registration-cohort-options" value={formData.cohortSearch} onChange={(event) => { const searchValue = event.target.value; const selectedCohort = cohorts.find((cohort) => getCohortLabel(cohort) === searchValue); setFormData((current) => ({ ...current, cohortSearch: searchValue, cohortId: selectedCohort ? String(getCohortId(selectedCohort)) : '' })); }} onFocus={() => { if (formData.cohortId) updateField('cohortSearch', formData.cohortSearch); }} placeholder={isLoadingCohorts ? 'Loading cohorts...' : 'Search and select a cohort'} disabled={isLoadingCohorts || cohorts.length === 0} autoComplete="off" /><datalist id="registration-cohort-options">{filteredCohorts.map((cohort) => <option key={getCohortId(cohort)} value={getCohortLabel(cohort)} />)}</datalist>{errors.cohortId && <span className="login-error" role="alert">{errors.cohortId}</span>}{cohortLoadError && <span className="login-error" role="alert">{cohortLoadError}</span>}{!isLoadingCohorts && !cohortLoadError && cohorts.length === 0 && <span className="login-error" role="alert">No cohorts are currently available.</span>}</label></div>
+        {errors.form && <p className="login-error" role="alert">{errors.form}</p>}<button className="planner-button login-submit" type="submit" disabled={isSubmitting || isLoadingCohorts}>{isSubmitting ? 'Creating account...' : 'Register'}</button><p className="auth-switch">Already have an account? <button type="button" onClick={onSignIn}>Sign in</button></p><p className="login-footer">StudySphere · Student Portal</p>
       </form></section>
     </main>
   )
