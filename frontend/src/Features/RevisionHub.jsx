@@ -1,4 +1,4 @@
-import {  useEffect, useState } from "react";  // React hooks, useState- stores changing data and useEffect- run code when things happen, like the component first loads.
+import { useEffect, useState } from "react";  // React hooks, useState- stores changing data and useEffect- run code when things happen, like the component first loads.
 import "./RevisionHub.css"; // imports the CSS file for this component
 
 const API_URL = "http://localhost:5000/api"; // base URL for Backend API
@@ -63,10 +63,19 @@ function RevisionHub() {
     const [showAnswer, setShowAnswer] = useState(false); //controls whether the answer should be displayed
     const [loading, setLoading] = useState(false); //used while API request is running. true = currently loading, false = not loading
     const [error, setError] = useState(""); //stores an error message 
+    const [savedQuizzes, setSavedQuizzes] = useState([]); //stores quizzes saved by the user
+    const [savedFlashcards, setSavedFlashcards] = useState([]); //stores flashcards saved by the user
+    const [historyLoading, setHistoryLoading] = useState(false); //used while loading saved quizzes/flashcards
+    const [historyError, setHistoryError] = useState(""); //stores an error message when loading saved quizzes/flashcards
+    const [openingRevision, setOpeningRevision] = useState(""); //stores the ID of the revision content the user is opening from history
+    const [historySearch, setHistorySearch] = useState(""); //stores the search term for filtering saved quizzes/flashcards
+    const [historyFilter, setHistoryFilter] = useState("all"); //stores the filter for saved quizzes/flashcards (all, quizzes, flashcards)
+    const [historyPage, setHistoryPage] = useState(1); //stores the current page of saved quizzes/flashcards
 
     /* Load Documents when Component Starts */
     useEffect(() => {
         loadDocuments(); //when user opens RevisionHub load the documents.
+        loadPreviousRevision(); //when user opens RevisionHub load the saved quizzes/flashcards.
     }, []);
 
     /* Load Documents From Backend */
@@ -104,6 +113,107 @@ function RevisionHub() {
             console.error("Load documents error:", error);
 
             setError(error.message || "Could not load study materials.");
+        }
+    }
+
+    /* Load Previously Saved Revision Content */
+    async function loadPreviousRevision() {
+        setHistoryLoading(true);
+        setHistoryError("");
+
+        try {
+            const token = getToken();
+
+            if (!token) {
+                throw new Error("You must be logged in to view saved revision content.");
+            }
+
+            const headers = {
+                Authorization: `Bearer ${token}`,
+            };
+
+
+            const [quizzesResponse, flashcardsResponse] = await Promise.all([
+                fetch(`${API_URL}/quizzes`, { headers }),
+                fetch(`${API_URL}/flashcards`, { headers }),
+            ]);
+
+
+            if (!quizzesResponse.ok || !flashcardsResponse.ok) {
+                throw new Error("Could not load saved revision content. Please try again.");
+            }
+
+            const quizzesData = await quizzesResponse.json();
+            const flashcardsData = await flashcardsResponse.json();
+
+            const quizzes = quizzesData.data;
+            const flashcardSets = flashcardsData.data;
+
+            if (!Array.isArray(quizzes) || !Array.isArray(flashcardSets)) {
+                throw new Error("Unexpected revision history response.");
+            }
+
+            setSavedQuizzes(quizzes);
+            setSavedFlashcards(flashcardSets);
+        } catch (error) {
+            console.error("Load revision history error:", error);
+            setHistoryError(error.message || "Could not load saved revision content.");
+        } finally {
+            setHistoryLoading(false);
+        }
+    }
+
+    /* Open a Previously Saved Revision Content */
+    async function openSavedRevision(type, id) {
+        setOpeningRevision(`${type}-${id}`);
+        setHistoryError("");
+
+        try {
+            const token = getToken();
+
+            if (!token) {
+                throw new Error("You must be logged in to open saved revision content.");
+            }
+
+            const endpoint = type === "quiz"
+                ? `${API_URL}/quizzes/${id}`
+                : `${API_URL}/flashcards/${id}`;
+
+            const response = await fetch(endpoint, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(data.message || `Could not open saved ${type}. Please try again.`);
+            }
+            const savedRevision = data.data;
+
+            const item = type === "quiz" ? savedRevision?.questions : savedRevision?.cards;
+
+            if (!Array.isArray(item) || item.length === 0) {
+                throw new Error(`The saved ${type} does not contain any content.`);
+            }
+            // Update the state with the loaded revision content
+            setContent(savedRevision);
+            setMode(type === "quiz" ? "quiz" : "flashcards");
+            setCurrentQuestion(0);
+            setSelectedAnswer({});
+            setShowAnswer(false);
+            setError("");
+
+            // Scroll to the top of the revision content
+            requestAnimationFrame(() => {
+                document.getElementById("revision-hub-active-content")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+        } catch (error) {
+            console.error(`Open saved ${type} error:`, error);
+            setError(error.message || `Could not open saved ${type}. Please try again.`);
+        } finally {
+            setOpeningRevision("");
         }
     }
 
@@ -441,6 +551,38 @@ function RevisionHub() {
         setError("");
     }
 
+    /*Search, filter, and pagination for saved quizzes and flashcards*/
+    const HISTORY_ITEMS_PER_PAGE = 5;
+
+    const previousRevisions = [
+        ...savedQuizzes.map((quiz) => ({
+            type: "quiz",
+            id: quiz.quiz_id,
+            title: quiz.title || "Untitled Quiz",
+            count: quiz.question_count,
+        })),
+        ...savedFlashcards.map((flashcard) => ({
+            type: "flashcards",
+            id: flashcard.flashcard_set_id,
+            title: flashcard.title || "Untitled Flashcard",
+            count: flashcard.card_count,
+        }))
+    ];
+
+    const filteredHistory = previousRevisions.filter((revision) => {
+        const mathesType = historyFilter === "all" || revision.type === historyFilter;
+        const matchesSearch = revision.title.toLowerCase().includes(historySearch.toLowerCase());
+        return mathesType && matchesSearch;
+    });
+    const totalHistoryPages = Math.max(1, Math.ceil(filteredHistory.length / HISTORY_ITEMS_PER_PAGE));
+
+    const currentHistoryPage = Math.min(historyPage, totalHistoryPages);
+
+    const visibleHistoryItems = filteredHistory.slice(
+        (currentHistoryPage - 1) * HISTORY_ITEMS_PER_PAGE,
+        currentHistoryPage * HISTORY_ITEMS_PER_PAGE
+    );
+
     /* USER Interface */
     return (
         <main className="revision-hub-page">
@@ -541,6 +683,151 @@ function RevisionHub() {
                     </button>
                 </div>
             </section>
+
+            {/* PREVIOUSLY SAVED REVISION CONTENT */}
+            <section className="revision-hub-page__history">
+                <div className="revision-hub-page__history-header">
+                    <div>
+                        <h2>Previous Revisions</h2>
+                        <p>Search and reopen your saved quizzes and flashcards.</p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={loadPreviousRevision}
+                        disabled={historyLoading}
+                    >
+                        {historyLoading ? "Refreshing..." : "Refresh"}
+                    </button>
+                </div>
+
+                <div className="revision-hub-page__history-filters">
+                    <input
+                        type="search"
+                        placeholder="Search previous revisions..."
+                        aria-label="Search previous revisions"
+                        value={historySearch}
+                        onChange={(event) => {
+                            setHistorySearch(event.target.value);
+                            setHistoryPage(1);
+                        }}
+                    />
+
+                    <select
+                        aria-label="Filter revision type"
+                        value={historyFilter}
+                        onChange={(event) => {
+                            setHistoryFilter(event.target.value);
+                            setHistoryPage(1);
+                        }}
+                    >
+                        <option value="all">All Revisions</option>
+                        <option value="quiz">Quizzes</option>
+                        <option value="flashcards">Flashcards</option>
+                    </select>
+                </div>
+
+                {historyError && (
+                    <p className="revision-hub-page__error">
+                        {historyError}
+                    </p>
+                )}
+
+                {historyLoading ? (
+                    <p>Loading previous revisions...</p>
+                ) : historyError ? null : visibleHistoryItems.length === 0 ? (
+                    <p className="revision-hub-page__history-empty">
+                        {previousRevisions.length === 0
+                            ? "No saved revisions yet."
+                            : "No revisions match your search."}
+                    </p>
+                ) : (
+                    <>
+                        <div className="revision-hub-page__history-results">
+                            {visibleHistoryItems.map((revision) => (
+                                <div
+                                    className="revision-hub-page__history-item"
+                                    key={`${revision.type}-${revision.id}`}
+                                >
+                                    <div>
+                                        <strong>{revision.title}</strong>
+                                        <p>
+                                            {revision.type === "quiz"
+                                                ? `Quiz · ${revision.count ?? "Unknown"} questions`
+                                                : `Flashcards · ${revision.count ?? "Unknown"} cards`}
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        disabled={!!openingRevision}
+                                        onClick={() =>
+                                            openSavedRevision(
+                                                revision.type,
+                                                revision.id
+                                            )
+                                        }
+                                    >
+                                        {openingRevision ===
+                                            `${revision.type}-${revision.id}`
+                                            ? "Opening..."
+                                            : revision.type === "quiz"
+                                                ? "Open Quiz"
+                                                : "Open Flashcards"}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="revision-hub-page__history-pagination">
+                            <p>
+                                Showing{" "}
+                                {(currentHistoryPage - 1) * HISTORY_ITEMS_PER_PAGE + 1}
+                                {"–"}
+                                {Math.min(
+                                    currentHistoryPage * HISTORY_ITEMS_PER_PAGE,
+                                    filteredHistory.length
+                                )}{" "}
+                                of {filteredHistory.length}
+                            </p>
+
+                            <div>
+                                <button
+                                    type="button"
+                                    disabled={currentHistoryPage === 1}
+                                    onClick={() =>
+                                        setHistoryPage((page) =>
+                                            Math.max(1, page - 1)
+                                        )
+                                    }
+                                >
+                                    Previous
+                                </button>
+
+                                <span>
+                                    Page {currentHistoryPage} of {totalHistoryPages}
+                                </span>
+
+                                <button
+                                    type="button"
+                                    disabled={
+                                        currentHistoryPage === totalHistoryPages
+                                    }
+                                    onClick={() =>
+                                        setHistoryPage((page) =>
+                                            Math.min(totalHistoryPages, page + 1)
+                                        )
+                                    }
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </section>
+
+
             {/* ERROR MESSAGE */}
             {error && (
                 <div className="revision-hub-page__error">
@@ -549,7 +836,7 @@ function RevisionHub() {
             )}
             {/* QUIZ */}
             {mode === "quiz" && questions.length > 0 && currentQuizQuestion && (
-                <section className="revision-hub-page__content">
+                <section id="revision-hub-active-content" className="revision-hub-page__content">
                     <div className="revision-hub-page__quiz-header">
                         <div>
                             <h2>Quiz</h2>
@@ -685,7 +972,7 @@ function RevisionHub() {
             )}
             {/* FLASHCARDS */}
             {mode === "flashcards" && cards.length > 0 && currentCard && (
-                <section className="revision-hub-page__flashcards">
+                <section id="revision-hub-active-content" className="revision-hub-page__flashcards">
                     <div className="revision-hub-page__flashcards-header">
                         <div>
                             <h2>Flashcards</h2>
@@ -763,4 +1050,5 @@ function RevisionHub() {
         </main>
     );
 }
+
 export default RevisionHub;
