@@ -10,16 +10,14 @@ const normalizeRole = (role) => {
     return null;
 };
 
-
 const register = async (req, res) => {
     try {
-       const {
+        const {
             first_name,
             last_name,
             student_number,
             email,
             password,
-            year_of_study,
             role,
             cohort_id
         } = req.body;
@@ -28,20 +26,19 @@ const register = async (req, res) => {
         const normalizedLastName = typeof last_name === "string" ? last_name.trim() : "";
         const normalizedStudentNumber = typeof student_number === "string" ? student_number.trim() : "";
         const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
-        const normalizedYearOfStudy = typeof year_of_study === "string"
-            ? year_of_study.trim()
-            : year_of_study;
         const normalizedRole = normalizeRole(role);
 
+        // Required fields (year_of_study removed, cohort_id now required)
         const requiredFields = [
             ["first_name", normalizedFirstName],
             ["last_name", normalizedLastName],
             ["student_number", normalizedStudentNumber],
             ["email", normalizedEmail],
             ["password", password],
-            ["year_of_study", normalizedYearOfStudy],
+            ["cohort_id", cohort_id],
             ["role", role]
         ];
+
         const missingField = requiredFields.find(([, value]) => (
             value === undefined || value === null || value === ""
         ));
@@ -70,12 +67,12 @@ const register = async (req, res) => {
             });
         }
 
-        const parsedYearOfStudy = Number(normalizedYearOfStudy);
-
-        if (!Number.isInteger(parsedYearOfStudy)) {
+        // Validate cohort_id is a number
+        const parsedCohortId = Number(cohort_id);
+        if (!Number.isInteger(parsedCohortId) || parsedCohortId <= 0) {
             return res.status(400).json({
-                message: "Year of study must be an integer.",
-                field: "year_of_study"
+                message: "Please select a valid cohort.",
+                field: "cohort_id"
             });
         }
 
@@ -113,13 +110,12 @@ const register = async (req, res) => {
 
         // Create the user in the database
         const result = await User.createUser(
-            cohort_id,
+            parsedCohortId,
             normalizedFirstName,
             normalizedLastName,
             normalizedStudentNumber,
             normalizedEmail,
             password_hash,
-            parsedYearOfStudy,
             normalizedRole
         );
 
@@ -131,36 +127,35 @@ const register = async (req, res) => {
                 last_name: normalizedLastName,
                 student_number: normalizedStudentNumber,
                 email: normalizedEmail,
-                year_of_study: parsedYearOfStudy,
-                cohort_id: cohort_id,
+                cohort_id: parsedCohortId,
                 role: normalizedRole,
                 is_active: 1
             }
         });
 
-   } catch (error) {
-    console.error("Registration error:", error);
+    } catch (error) {
+        console.error("Registration error:", error);
 
-    // Handle duplicate email or student number
-    if (error.code === "ER_DUP_ENTRY") {
-        const duplicateKey = String(error.sqlMessage || error.message || "").toLowerCase();
+        // Handle duplicate email or student number
+        if (error.code === "ER_DUP_ENTRY") {
+            const duplicateKey = String(error.sqlMessage || error.message || "").toLowerCase();
 
-        if (duplicateKey.includes("student_number")) {
+            if (duplicateKey.includes("student_number")) {
+                return res.status(409).json({
+                    message: "An account with this student number already exists.",
+                    field: "student_number"
+                });
+            }
+
             return res.status(409).json({
-                message: "An account with this student number already exists.",
-                field: "student_number"
+                message: "An account with this email already exists.",
+                field: "email"
             });
         }
 
-        return res.status(409).json({
-            message: "An account with this email already exists.",
-            field: "email"
+        return res.status(500).json({
+            message: "Server error during registration."
         });
-    }
-
-    return res.status(500).json({
-        message: "Server error during registration."
-    });
     }
 };
 
