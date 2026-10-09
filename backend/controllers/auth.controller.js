@@ -2,6 +2,13 @@ const bcrypt = require("bcrypt");
 const User = require("../models/user.model");
 const jwt = require("jsonwebtoken");
 
+const normalizeRole = (role) => {
+    if (typeof role !== "string") return null;
+    const normalizedRole = role.trim().toLowerCase();
+    if (normalizedRole === "student") return "student";
+    if (normalizedRole === "admin" || normalizedRole === "administrator") return "admin";
+    return null;
+};
 
 
 const register = async (req, res) => {
@@ -13,6 +20,7 @@ const register = async (req, res) => {
             email,
             password,
             year_of_study,
+            role,
             cohort_id
         } = req.body;
 
@@ -23,6 +31,7 @@ const register = async (req, res) => {
         const normalizedYearOfStudy = typeof year_of_study === "string"
             ? year_of_study.trim()
             : year_of_study;
+        const normalizedRole = normalizeRole(role);
 
         const requiredFields = [
             ["first_name", normalizedFirstName],
@@ -30,7 +39,8 @@ const register = async (req, res) => {
             ["student_number", normalizedStudentNumber],
             ["email", normalizedEmail],
             ["password", password],
-            ["year_of_study", normalizedYearOfStudy]
+            ["year_of_study", normalizedYearOfStudy],
+            ["role", role]
         ];
         const missingField = requiredFields.find(([, value]) => (
             value === undefined || value === null || value === ""
@@ -40,6 +50,13 @@ const register = async (req, res) => {
             return res.status(400).json({
                 message: "Please provide all required fields.",
                 field: missingField[0]
+            });
+        }
+
+        if (!normalizedRole) {
+            return res.status(400).json({
+                message: "Please select a valid role.",
+                field: "role"
             });
         }
 
@@ -102,7 +119,8 @@ const register = async (req, res) => {
             normalizedStudentNumber,
             normalizedEmail,
             password_hash,
-            parsedYearOfStudy
+            parsedYearOfStudy,
+            normalizedRole
         );
 
         return res.status(201).json({
@@ -115,7 +133,7 @@ const register = async (req, res) => {
                 email: normalizedEmail,
                 year_of_study: parsedYearOfStudy,
                 cohort_id: cohort_id,
-                role: "student",
+                role: normalizedRole,
                 is_active: 1
             }
         });
@@ -186,12 +204,19 @@ const login = async (req, res) => {
             });
         }
 
+        const role = normalizeRole(user.role);
+        if (!role) {
+            return res.status(403).json({
+                message: "Your account role is missing or invalid. Please contact an administrator."
+            });
+        }
+
         // Create JWT
         const token = jwt.sign(
             {
                 user_id: user.user_id,
                 email: user.email,
-                role: user.role
+                role
             },
             process.env.JWT_SECRET,
             {
@@ -208,7 +233,7 @@ const login = async (req, res) => {
                 last_name: user.last_name,
                 email: user.email,
                 cohort_id: user.cohort_id,
-                role: user.role
+                role
             }
         });
 

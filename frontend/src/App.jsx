@@ -74,7 +74,9 @@ function saveAnnouncements(email, announcementsToSave) {
 function loadSession() {
   try {
     const session = JSON.parse(localStorage.getItem('studysphere_session') || 'null')
-    return session?.token && session?.user ? session : null
+    const role = session?.user?.role?.toLowerCase()
+    if (!session?.token || !session?.user || !['student', 'admin', 'administrator'].includes(role)) return null
+    return { ...session, user: { ...session.user, role: role === 'administrator' ? 'admin' : role } }
   } catch {
     return null
   }
@@ -640,6 +642,7 @@ export function Registration({ onSignIn }) {
     confirmPassword: '',
     programme: '',
     yearOfStudy: '',
+    role: '',
   })
   const [errors, setErrors] = useState({})
   const [success, setSuccess] = useState(false)
@@ -658,6 +661,7 @@ export function Registration({ onSignIn }) {
     const studentNumber = formData.studentNumber.trim()
     const email = formData.email.trim().toLowerCase()
     const yearOfStudy = formData.yearOfStudy.trim()
+    const role = formData.role.trim().toLowerCase()
     const nextErrors = {}
     const namePattern = /^[\p{L}][\p{L}\s'-]*[\p{L}]$/u
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -677,6 +681,7 @@ export function Registration({ onSignIn }) {
     else if (formData.password !== formData.confirmPassword) nextErrors.confirmPassword = 'Passwords do not match.'
     if (!yearOfStudy) nextErrors.yearOfStudy = 'Please select your year of study.'
     else if (!Number.isInteger(Number(yearOfStudy))) nextErrors.yearOfStudy = 'Year of study must be a whole number.'
+    if (!['student', 'administrator'].includes(role)) nextErrors.role = 'Please select a role.'
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
@@ -691,6 +696,7 @@ export function Registration({ onSignIn }) {
         email,
         password: formData.password,
         year_of_study: Number(yearOfStudy),
+        role,
       })
       setSuccess(true)
     } catch (error) {
@@ -701,6 +707,7 @@ export function Registration({ onSignIn }) {
         email: 'email',
         password: 'password',
         year_of_study: 'yearOfStudy',
+        role: 'role',
       }
       const formField = fieldMap[error.field]
 
@@ -739,7 +746,7 @@ export function Registration({ onSignIn }) {
         <div className="registration-grid">{inputFields.map(([field, label, type, autoComplete]) => <label className="login-field" key={field}>{label}<span className="login-input-wrap"><input type={type} value={formData[field]} onChange={(event) => updateField(field, event.target.value)} autoComplete={autoComplete} /></span>{errors[field] && <span className="login-error" role="alert">{errors[field]}</span>}</label>)}</div>
         <label className="login-field">Password<span className="login-input-wrap"><input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={(event) => updateField('password', event.target.value)} autoComplete="new-password" /><button className="password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label="Toggle password visibility">◉</button></span>{errors.password && <span className="login-error" role="alert">{errors.password}</span>}</label>
         <label className="login-field">Confirm password<span className="login-input-wrap"><input type={showConfirmPassword ? 'text' : 'password'} value={formData.confirmPassword} onChange={(event) => updateField('confirmPassword', event.target.value)} autoComplete="new-password" /><button className="password-toggle" type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label="Toggle confirmation password visibility">◉</button></span>{errors.confirmPassword && <span className="login-error" role="alert">{errors.confirmPassword}</span>}</label>
-        <div className="registration-grid optional-fields"><label className="login-field">Course / Programme<input type="text" value={formData.programme} onChange={(event) => updateField('programme', event.target.value)} /></label><label className="login-field">Year of study<select value={formData.yearOfStudy} onChange={(event) => updateField('yearOfStudy', event.target.value)}><option value="">Select year</option><option>1</option><option>2</option><option>3</option><option value="4">4+</option></select>{errors.yearOfStudy && <span className="login-error" role="alert">{errors.yearOfStudy}</span>}</label></div>
+        <div className="registration-grid optional-fields"><label className="login-field">Role<select required value={formData.role} onChange={(event) => updateField('role', event.target.value)}><option value="">Select role</option><option value="student">Student</option><option value="administrator">Administrator</option></select>{errors.role && <span className="login-error" role="alert">{errors.role}</span>}</label><label className="login-field">Course / Programme<input type="text" value={formData.programme} onChange={(event) => updateField('programme', event.target.value)} /></label><label className="login-field">Year of study<select value={formData.yearOfStudy} onChange={(event) => updateField('yearOfStudy', event.target.value)}><option value="">Select year</option><option>1</option><option>2</option><option>3</option><option value="4">4+</option></select>{errors.yearOfStudy && <span className="login-error" role="alert">{errors.yearOfStudy}</span>}</label></div>
         {errors.form && <p className="login-error" role="alert">{errors.form}</p>}<button className="planner-button login-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Creating account...' : 'Register'}</button><p className="auth-switch">Already have an account? <button type="button" onClick={onSignIn}>Sign in</button></p><p className="login-footer">StudySphere · Student Portal</p>
       </form></section>
     </main>
@@ -747,7 +754,7 @@ export function Registration({ onSignIn }) {
 }
 
 function App() {
-  const [activeNav, setActiveNav] = useState('dashboard')
+  const [activeNav, setActiveNav] = useState(() => loadSession()?.user?.role === 'admin' ? 'analytics' : 'dashboard')
   const [authView, setAuthView] = useState('login')
   const [user, setUser] = useState(() => loadSession()?.user || null)
   const [announcements, setAnnouncements] = useState(() => {
@@ -806,6 +813,7 @@ function App() {
 
     setUser(authenticatedUser)
     saveSession({ token, user: authenticatedUser })
+    setActiveNav(authenticatedUser.role === 'admin' ? 'analytics' : 'dashboard')
     setSessionDate(formattedDate)
     setTasks(loadTasks(authenticatedUser.email))
     setAnnouncements(loadAnnouncements(authenticatedUser.email))
@@ -879,6 +887,11 @@ function App() {
   }
 
   const currentUser = user
+  const isAdministrator = currentUser.role === 'admin'
+  const currentNav = (isAdministrator
+    ? ['analytics', 'users', 'modules', 'announcements']
+    : ['dashboard', 'study-materials', 'ai-chat', 'revision', 'planner']
+  ).includes(activeNav) ? activeNav : isAdministrator ? 'analytics' : 'dashboard'
   const firstName = currentUser.firstName.trim()
   const surname = currentUser.surname?.trim() || ''
   const initials = `${firstName.charAt(0)}${surname.charAt(0)}`.toUpperCase()
@@ -887,6 +900,8 @@ function App() {
   const todayTasks = sortTasksByDate(tasks.filter((task) => getTaskStatus(task) === 'today'))
   const pastTasks = sortTasksByDate(tasks.filter((task) => ['overdue', 'completed'].includes(getTaskStatus(task))))
 
+  
+  
   return (
     <div className="app-shell">
       <SuccessNotice message={successMessage} />
@@ -897,17 +912,17 @@ function App() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Main navigation">
-          <div className="nav-group">
+          {!isAdministrator && <div className="nav-group">
             <p className="nav-label">Student</p>
             <button
-              className={`nav-item ${activeNav === 'dashboard' ? 'active' : ''}`}
+              className={`nav-item ${currentNav === 'dashboard' ? 'active' : ''}`}
               type="button"
               onClick={() => setActiveNav('dashboard')}
             >
               <span className="nav-icon grid"></span>
               Dashboard
             </button>
-            <button className={`nav-item ${activeNav === 'study-materials' ? 'active' : ''}`}
+            <button className={`nav-item ${currentNav === 'study-materials' ? 'active' : ''}`}
             type="button"
             onClick={() => setActiveNav('study-materials')}
             >
@@ -915,7 +930,7 @@ function App() {
               Study materials
             </button>
 
-            <button className={`nav-item ${activeNav === 'ai-chat' ? 'active' : ''}`}
+            <button className={`nav-item ${currentNav === 'ai-chat' ? 'active' : ''}`}
             type="button"
             onClick={() => setActiveNav('ai-chat')}
             >
@@ -923,7 +938,7 @@ function App() {
               AI chat assistant
             </button>
 
-            <button className={`nav-item ${activeNav === 'revision' ? 'active' : ''}`}
+            <button className={`nav-item ${currentNav === 'revision' ? 'active' : ''}`}
             type="button"
             onClick={() => setActiveNav('revision')}
             >
@@ -932,19 +947,19 @@ function App() {
             </button>
 
             <button
-              className={`nav-item ${activeNav === 'planner' ? 'active' : ''}`}
+              className={`nav-item ${currentNav === 'planner' ? 'active' : ''}`}
               type="button"
               onClick={() => setActiveNav('planner')}
             >
               <span className="nav-icon planner"></span>
               Study planner
             </button>
-          </div>
+          </div>}
 
-          <div className="nav-group">
+          {isAdministrator && <div className="nav-group">
             <p className="nav-label">Administrator</p>
             <button
-              className={`nav-item ${activeNav === 'analytics' ? 'active' : ''}`}
+              className={`nav-item ${currentNav === 'analytics' ? 'active' : ''}`}
               type="button"
               onClick={() => setActiveNav('analytics')}
             >
@@ -952,7 +967,7 @@ function App() {
               Analytics
             </button>
             <button
-              className={`nav-item ${activeNav === 'users' ? 'active' : ''}`}
+              className={`nav-item ${currentNav === 'users' ? 'active' : ''}`}
               type="button"
               onClick={() => setActiveNav('users')}
             >
@@ -960,7 +975,7 @@ function App() {
               User management
             </button>
             <button
-              className={`nav-item ${activeNav === 'modules' ? 'active' : ''}`}
+              className={`nav-item ${currentNav === 'modules' ? 'active' : ''}`}
               type="button"
               onClick={() => setActiveNav('modules')}
             >
@@ -968,14 +983,14 @@ function App() {
               Modules &amp; cohorts
             </button>
             <button
-              className={`nav-item ${activeNav === 'announcements' ? 'active' : ''}`}
+              className={`nav-item ${currentNav === 'announcements' ? 'active' : ''}`}
               type="button"
               onClick={() => setActiveNav('announcements')}
             >
               <span className="nav-icon announce"></span>
               Announcements
             </button>
-          </div>
+          </div>}
 
           <div className="nav-group preview">
             <button className="nav-item" type="button">
@@ -989,7 +1004,7 @@ function App() {
           <div className="profile-avatar">{initials}</div>
           <div className="profile-text">
             <strong>{fullName}</strong>
-            <span>Student</span>
+            <span>{isAdministrator ? 'Administrator' : 'Student'}</span>
           </div>
         </div>
       </aside>
@@ -1000,7 +1015,7 @@ function App() {
           <button className="logout-button" type="button" onClick={handleLogout}>Log out</button>
         </div>
 
-        {activeNav === 'dashboard' ? (
+        {currentNav === 'dashboard' ? (
           <DashboardOverview
             currentUser={currentUser}
             sessionDate={sessionDate}
@@ -1013,7 +1028,7 @@ function App() {
             onDeleteTask={handleDeleteTask}
             onToggleTask={handleToggleTask}
           />
-        ) : activeNav === 'planner' ? (
+        ) : currentNav === 'planner' ? (
           <section className="planner-view focused">
             <header className="planner-header">
               <div className="page-title-block">
@@ -1052,23 +1067,23 @@ function App() {
             </section>
           </section>
           
-        ): activeNav === 'study-materials' ? (
+        ): currentNav === 'study-materials' ? (
           <StudyMaterials />
-        ): activeNav === 'ai-chat' ? (
+        ): currentNav === 'ai-chat' ? (
           <AIChat />
-        ): activeNav === 'revision' ? (
+        ): currentNav === 'revision' ? (
           <RevisionHub />
 
-        ) : activeNav === 'analytics' ? (
+        ) : currentNav === 'analytics' ? (
           <AnalyticsDashboard />
-        ) : activeNav === 'users' ? (
+        ) : currentNav === 'users' ? (
           <UserManagement />
-        ) : activeNav === 'modules' ? (
+        ) : currentNav === 'modules' ? (
           <ModulesAndCohorts />
         ) : null}
       </main>
 
-      {activeNav === 'announcements' && (
+      {currentNav === 'announcements' && (
         <section className="announcements-screen">
           <div className="app-icons-bar">
             <button className="mini-app gmail" type="button" aria-label="Gmail" />

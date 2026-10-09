@@ -1,9 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db"); 
+const {
+    authenticateToken,
+    requireRole
+} = require("../middleware/auth.middleware");
 
 // GET /api/analytics - Fetch live summary analytics & dynamic growth from Aiven DB
-router.get("/", async (req, res) => {
+router.get(
+    "/",
+    authenticateToken,
+    requireRole("admin"),
+    async (req, res) => {
     try {
         // 1. Fetch total active users count
         const [userCountResult] = await db.query("SELECT COUNT(*) AS total FROM USER");
@@ -36,24 +44,72 @@ router.get("/", async (req, res) => {
         const [moduleCountResult] = await db.query("SELECT COUNT(*) AS total FROM MODULE");
         const modulesLive = moduleCountResult[0]?.total || 0;
 
-        // 4. Fetch live AI/chat requests count
-        const [aiResult] = await db.query("SELECT COUNT(*) AS total FROM CHAT_MESSAGE");
-        const aiRequestsToday = aiResult[0]?.total || 0;
+        // 4. Fetch live AI requests count for today only
+       const [aiResult] = await db.query(
+            "SELECT COUNT(*) AS total FROM CHAT_MESSAGE WHERE DATE(created_at) = CURDATE()"
+        );
+        const aiRequestsToday = aiResult[0]?.total || 0; 
+        
+        //Count the system errors
+        let systemErrors = 0;
+        try {
+            const [errorResult] = await db.query(`
+                SELECT COUNT(*) AS total 
+                FROM USER_ACTIVITY_LOG 
+                WHERE LOWER(activity_type) LIKE '%system_error%' 
+                AND created_at >= NOW() - INTERVAL 24 HOUR
+            `);
+            systemErrors = errorResult[0]?.total || 0;
+        } catch (errErr) {
+            console.error("System errors count error:", errErr.message);
+        }
 
-        // 5. Fetch active modules list for display
-        const [dbModules] = await db.query("SELECT module_code, module_name FROM MODULE LIMIT 4");
-        const activeModulesList = dbModules.map((m, index) => ({
+// 5. Fetch active modules based on actual AI chat interactions/usage
+let activeModulesList = [];
+try {
+    const [moduleUsage] = await db.query(`
+        SELECT m.module_name, m.module_code, COUNT(c.chat_session_id) AS interaction_count
+        FROM MODULE m
+        LEFT JOIN CHAT_SESSION c ON m.module_id = c.module_id
+        GROUP BY m.module_id, m.module_name, m.module_code
+        ORDER BY interaction_count DESC
+        LIMIT 4
+    `);
+
+    // Find the highest count to calculate a relative percentage (max 100%)
+    const maxCount = moduleUsage[0]?.interaction_count || 1;
+
+    activeModulesList = moduleUsage.map(m => {
+        const count = m.interaction_count || 0;
+        // Calculate percentage relative to the most active module, with a minimum fallback for display
+        const percentage = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0;
+        
+        return {
             name: m.module_name || m.module_code,
-            percentage: 100 - (index * 20)
-        }));
-
+            percentage: percentage > 0 ? percentage : 10 // Gives a small visible bar even if count is 0
+        };
+        });
+            } catch (usageErr) {
+                // Fallback if the join fails
+                const [dbModules] = await db.query("SELECT module_code, module_name FROM MODULE LIMIT 4");
+                activeModulesList = dbModules.map((m, index) => ({
+                    name: m.module_name || m.module_code,
+                    percentage: 100 - (index * 20)
+                }));
+            }
         // 6. Fetch recent system logs from activity table
         let recentLogs = [];
         try {
-            const [logs] = await db.query("SELECT * FROM USER_ACTIVITY_LOG ORDER BY created_at DESC LIMIT 5");
+            const [logs] = await db.query(`
+                SELECT * 
+                FROM USER_ACTIVITY_LOG 
+                ORDER BY created_at DESC 
+                LIMIT 5
+            `);
+            
             recentLogs = logs.map(l => ({
-                type: l.action || l.activity_type || 'Activity',
-                message: l.details || l.description || 'System interaction',
+                type: l.action || l.activity_type || l.log_level || 'Activity',
+                message: l.details || l.description || l.message || 'System interaction',
                 time: l.created_at ? new Date(l.created_at).toLocaleTimeString() : 'Recent'
             }));
         } catch (logErr) {
@@ -67,7 +123,7 @@ router.get("/", async (req, res) => {
                 userGrowth: userGrowthText, // Now fully dynamic!
                 modulesLive,
                 aiRequestsToday,
-                systemErrors: 0,
+                systemErrors ,
                 activeModules: activeModulesList,
                 recentLogs
             }

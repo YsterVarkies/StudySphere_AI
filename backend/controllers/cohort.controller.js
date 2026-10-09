@@ -1,13 +1,21 @@
-const Cohort = require("../models/cohort.model");
+
+const db = require('../config/db');const Cohort = require("../models/cohort.model");
+
 
 // Get all cohorts
 const getCohorts = async (req, res) => {
     try {
         const cohorts = await Cohort.getAllCohorts();
 
+        const formattedCohorts = cohorts.map(c => ({
+            id: c.cohort_id,
+            name: c.cohort_name,
+            academicYear: c.academic_year || 2026
+        }));
+
         return res.status(200).json({
             message: "Cohorts retrieved successfully.",
-            cohorts
+            cohorts: formattedCohorts
         });
 
     } catch (error) {
@@ -16,6 +24,48 @@ const getCohorts = async (req, res) => {
         return res.status(500).json({
             message: "Server error while retrieving cohorts."
         });
+    }
+};
+
+const updateCohort = async (req, res) => {
+    try {
+        const cohortId = req.params.id;
+        const { cohort_name, academic_year } = req.body;
+
+        // If your columns are named 'name' and 'academic_year', adjust them here:
+        const [result] = await db.query(
+            "UPDATE COHORT SET cohort_name = ?, academic_year = ? WHERE cohort_id = ?",
+            [cohort_name, academic_year, cohortId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Cohort not found' });
+        }
+
+        return res.status(200).json({ message: 'Cohort updated successfully' });
+    } catch (error) {
+        console.error('Error updating cohort:', error);
+        return res.status(500).json({ message: 'Failed to update cohort' });
+    }
+};
+
+const deleteCohort = async (req, res) => {
+    try {
+        const cohortId = req.params.id;
+
+        // Clear dependency links
+        await db.query("DELETE FROM COHORT_MODULE WHERE cohort_id = ?", [cohortId]);
+
+        const [result] = await db.query("DELETE FROM COHORT WHERE cohort_id = ?", [cohortId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Cohort not found' });
+        }
+
+        return res.status(200).json({ message: 'Cohort deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting cohort:', error);
+        return res.status(500).json({ message: 'Failed to delete cohort due to foreign key constraints.' });
     }
 };
 
@@ -32,9 +82,15 @@ const getCohort = async (req, res) => {
             });
         }
 
+        const formattedCohort = {
+            id: cohort.cohort_id,
+            name: cohort.cohort_name,
+            academicYear: cohort.academic_year || 2026
+        };
+
         return res.status(200).json({
             message: "Cohort retrieved successfully.",
-            cohort
+            cohort: formattedCohort
         });
 
     } catch (error) {
@@ -85,6 +141,8 @@ const createCohort = async (req, res) => {
 
 module.exports = {
     getCohorts,
+    deleteCohort,
+    updateCohort,
     getCohort,
     createCohort
 };

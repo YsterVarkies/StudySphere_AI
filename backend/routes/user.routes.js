@@ -22,6 +22,12 @@ router.get('/', userController.getAllUsers);
 // Get one user by ID
 router.get('/:id', userController.getUserById);
 
+// Update a user (Name, Email, Role) - supports full edit modal
+router.put('/:id', userController.updateUser);
+
+// Delete a user
+router.delete('/:id', userController.deleteUser);
+
 // Update a user's role
 router.patch('/:id/role', userController.updateUserRole);
 
