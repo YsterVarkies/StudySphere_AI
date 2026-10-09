@@ -1,9 +1,18 @@
 require('dotenv').config();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const mammoth = require('mammoth');
+const { PDFParse } = require('pdf-parse');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODEL_NAME = 'gemini-3.8-flash';
+const openrouter = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+  defaultHeaders: {
+    'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'http://localhost:5000',
+    'X-Title': process.env.OPENROUTER_APP_NAME || 'StudySphere',
+  },
+});
+
+const MODEL_NAME = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 function normalizeDifficulty(difficulty) {
@@ -62,6 +71,14 @@ Do not rely only on direct recall.
 `;
 }
 
+function getStudyText(documentContent) {
+  if (!documentContent) return '';
+  if (documentContent.type === 'text') {
+    return String(documentContent.content || '');
+  }
+  return '';
+}
+
 async function extractDocumentContent(fileBuffer, mimeType, fileName) {
   if (!fileBuffer || fileBuffer.length === 0) {
     throw new Error('Document is empty');
@@ -105,10 +122,18 @@ async function extractDocumentContent(fileBuffer, mimeType, fileName) {
   }
 
   if (safeMimeType === 'application/pdf' || safeFileName.endsWith('.pdf')) {
+    const parser = new PDFParse({ data: fileBuffer });
+    const textResult = await parser.getText();
+    const text = (textResult.text || '').trim();
+
+    if (!text) {
+      throw new Error('PDF document contains no readable text');
+    }
+
     return {
-      type: 'pdf',
-      content: fileBuffer,
-      mimeType: 'application/pdf',
+      type: 'text',
+      content: text.length > 50000 ? text.substring(0, 50000) + '...' : text,
+      mimeType: 'text/plain',
       fileName,
     };
   }
@@ -118,26 +143,24 @@ async function extractDocumentContent(fileBuffer, mimeType, fileName) {
   );
 }
 
-async function generateContent(prompt, documentContent) {
-  const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+async function generateContent(prompt, documentContent, options = {}) {
+  const studyText = getStudyText(documentContent);
+  const userContent = studyText
+    ? `${prompt}\n\nSTUDY MATERIAL:\n${studyText}`
+    : prompt;
 
-  const content = [{ text: prompt }];
+  const request = {
+    model: MODEL_NAME,
+    messages: [{ role: 'user', content: userContent }],
+    temperature: options.temperature ?? 0.3,
+  };
 
-  if (documentContent && documentContent.type === 'pdf') {
-    content.push({
-      inlineData: {
-        mimeType: 'application/pdf',
-        data: documentContent.content.toString('base64'),
-      },
-    });
-  } else if (documentContent) {
-    content.push({
-      text: `\n\nSTUDY MATERIAL:\n${documentContent.content}`,
-    });
+  if (options.json) {
+    request.response_format = { type: 'json_object' };
   }
 
-  const result = await model.generateContent(content);
-  return result.response.text();
+  const completion = await openrouter.chat.completions.create(request);
+  return completion.choices[0].message.content;
 }
 
 async function chat(question, documentContent = null, fileName = '') {
@@ -168,7 +191,7 @@ ${question}
 `;
   }
 
-  return generateContent(prompt, documentContent);
+  return generateContent(prompt, documentContent, { temperature: 0.4 });
 }
 
 async function generateQuiz(
@@ -183,6 +206,10 @@ async function generateQuiz(
   );
   const normalizedDifficulty = normalizeDifficulty(difficulty);
   const difficultyInstructions = getDifficultyInstructions(normalizedDifficulty);
+
+  if (!documentContent || !getStudyText(documentContent).trim()) {
+    throw new Error('Study material is required to generate a quiz');
+  }
 
   const prompt = `
 You are creating a multiple-choice quiz for a university student.
@@ -228,45 +255,25 @@ Document:
 ${fileName}
 `;
 
-  const model = genAI.getGenerativeModel({
-    model: MODEL_NAME,
-    generationConfig: {
-      responseMimeType: 'application/json',
-    },
+  const raw = await generateContent(prompt, documentContent, {
+    json: true,
+    temperature: 0.3,
   });
-
-  const content = [{ text: prompt }];
-
-  if (documentContent && documentContent.type === 'pdf') {
-    content.push({
-      inlineData: {
-        mimeType: 'application/pdf',
-        data: documentContent.content.toString('base64'),
-      },
-    });
-  } else {
-    content.push({
-      text: `\n\nSTUDY MATERIAL:\n${documentContent.content}`,
-    });
-  }
-
-  const result = await model.generateContent(content);
-  const raw = result.response.text();
 
   let parsed;
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new Error('Gemini returned invalid quiz JSON');
+    throw new Error('OpenRouter returned invalid quiz JSON');
   }
 
   if (!parsed || !Array.isArray(parsed.questions)) {
-    throw new Error('Gemini did not return a questions array');
+    throw new Error('OpenRouter did not return a questions array');
   }
 
   if (parsed.questions.length !== requestedNumber) {
     throw new Error(
-      `Gemini returned ${parsed.questions.length} questions instead of ${requestedNumber}`
+      `OpenRouter returned ${parsed.questions.length} questions instead of ${requestedNumber}`
     );
   }
 
@@ -323,6 +330,10 @@ async function generateFlashcards(
   const normalizedDifficulty = normalizeDifficulty(difficulty);
   const difficultyInstructions = getDifficultyInstructions(normalizedDifficulty);
 
+  if (!documentContent || !getStudyText(documentContent).trim()) {
+    throw new Error('Study material is required to generate flashcards');
+  }
+
   const prompt = `
 You are creating study flashcards for a university student.
 Read the study material carefully.
@@ -353,45 +364,25 @@ Document:
 ${fileName}
 `;
 
-  const model = genAI.getGenerativeModel({
-    model: MODEL_NAME,
-    generationConfig: {
-      responseMimeType: 'application/json',
-    },
+  const raw = await generateContent(prompt, documentContent, {
+    json: true,
+    temperature: 0.3,
   });
-
-  const content = [{ text: prompt }];
-
-  if (documentContent && documentContent.type === 'pdf') {
-    content.push({
-      inlineData: {
-        mimeType: 'application/pdf',
-        data: documentContent.content.toString('base64'),
-      },
-    });
-  } else {
-    content.push({
-      text: `\n\nSTUDY MATERIAL:\n${documentContent.content}`,
-    });
-  }
-
-  const result = await model.generateContent(content);
-  const raw = result.response.text();
 
   let parsed;
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new Error('Gemini returned invalid flashcard JSON');
+    throw new Error('OpenRouter returned invalid flashcard JSON');
   }
 
   if (!parsed || !Array.isArray(parsed.flashcards)) {
-    throw new Error('Gemini did not return a flashcards array');
+    throw new Error('OpenRouter did not return a flashcards array');
   }
 
   if (parsed.flashcards.length !== requestedNumber) {
     throw new Error(
-      `Gemini returned ${parsed.flashcards.length} flashcards instead of ${requestedNumber}`
+      `OpenRouter returned ${parsed.flashcards.length} flashcards instead of ${requestedNumber}`
     );
   }
 
