@@ -1,22 +1,19 @@
-const express = require("express");
 
+const express = require("express");
 const router = express.Router();
 
-const moduleController = require('../controllers/module.controller');
-
+const moduleController = require("../controllers/module.controller");
 const {
     authenticateToken,
     requireRole
 } = require("../middleware/auth.middleware");
 
-const {
-    getModules,
-    createModule
-} = require("../controllers/module.controller");
+// Logged-in students and admins can view modules
+router.get("/", authenticateToken, moduleController.getModules);
 
-router.get("/", authenticateToken, requireRole("admin"), moduleController.getModules);
-router.post("/", authenticateToken, requireRole("admin"), createModule);
-router.put('/:id', authenticateToken, requireRole("admin"), moduleController.updateModule);
-router.delete('/:id', authenticateToken, requireRole("admin"), moduleController.deleteModule);
+// Only admins can manage modules
+router.post("/", authenticateToken, requireRole("admin"), moduleController.createModule);
+router.put("/:id", authenticateToken, requireRole("admin"), moduleController.updateModule);
+router.delete("/:id", authenticateToken, requireRole("admin"), moduleController.deleteModule);
 
 module.exports = router;

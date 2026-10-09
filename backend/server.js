@@ -1,3 +1,4 @@
+
 const path = require("path");
 require("dotenv").config({
     path: path.resolve(__dirname, ".env")
@@ -29,7 +30,7 @@ async function testDatabaseConnection() {
 
 const { authenticateToken, requireRole } = require("./middleware/auth.middleware");
 
-// YOUR ROUTES
+// ROUTES
 
 const authRoutes = require("./routes/auth.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
@@ -76,12 +77,15 @@ const analyticsRoutes = require("./routes/analytics.routes");
 const userRoutes = require("./routes/user.routes");
 const moduleRoutes = require("./routes/module.routes");
 const cohortRoutes = require("./routes/cohort.routes");
+const cohortController = require("./controllers/cohort.controller");
+
+// Public read-only endpoint for registration
+app.get("/api/cohorts/public", cohortController.getCohorts);
 
 app.use("/api/analytics", authenticateToken, requireRole("admin"), analyticsRoutes);
 app.use("/api/users", authenticateToken, requireRole("admin"), userRoutes);
-app.use("/api/modules", moduleRoutes);
-app.use("/api/cohorts", authenticateToken, requireRole("admin"), cohortRoutes);
-
+app.use("/api/modules", authenticateToken, requireRole("admin"), moduleRoutes); 
+app.use("/api/cohorts", authenticateToken, requireRole("admin"), cohortRoutes);;
 //End Admin Code
 
 
