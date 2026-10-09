@@ -603,3 +603,233 @@
     font-size: 17px;
   }
 }
+
+/* ==========================================
+   PREVIOUSLY SAVED REVISION CONTENT
+   ========================================== */
+
+.revision-hub-page__history {
+    margin: 20px 0;
+    padding: 28px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.revision-hub-page__history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.revision-hub-page__history-header h2 {
+    margin: 0 0 8px;
+    color: #0a203d;
+    font-size: 23px;
+    font-weight: 700;
+}
+
+.revision-hub-page__history-header p {
+    margin: 0;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.revision-hub-page__history-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+}
+
+.revision-hub-page__history-list h3 {
+    margin: 0 0 16px;
+    color: #0a203d;
+    font-size: 18px;
+}
+
+.revision-hub-page__history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.revision-hub-page__history-item > div {
+    flex: 1;
+    min-width: 0;
+}
+
+.revision-hub-page__history-item strong {
+    display: block;
+    color: #0a203d;
+    font-size: 14px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.revision-hub-page__history-item p {
+    margin: 6px 0 0;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.revision-hub-page__history button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 9px;
+    background: #e07a19;
+    color: #ffffff;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s ease;
+}
+
+.revision-hub-page__history button:hover:not(:disabled) {
+    background: #cf6d12;
+}
+
+.revision-hub-page__history button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive Previous Revisions */
+
+@media (max-width: 800px) {
+    .revision-hub-page__history {
+        padding: 20px;
+    }
+
+    .revision-hub-page__history-list {
+        grid-template-columns: 1fr;
+    }
+
+    .revision-hub-page__history-header {
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .revision-hub-page__history-header,
+    .revision-hub-page__history-item {
+        flex-wrap: wrap;
+    }
+}
+
+/* Previous Revisions: Search and Pagination */
+
+.revision-hub-page__history-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.revision-hub-page__history-filters input,
+.revision-hub-page__history-filters select {
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #0a203d;
+    font: inherit;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.revision-hub-page__history-filters input {
+    flex: 1 1 250px;
+    min-width: 0;
+}
+
+.revision-hub-page__history-filters select {
+    flex: 0 1 190px;
+}
+
+.revision-hub-page__history-filters input:focus,
+.revision-hub-page__history-filters select:focus {
+    outline: none;
+    border-color: #e07a19;
+    box-shadow: 0 0 0 3px rgba(224, 122, 25, 0.12);
+}
+
+.revision-hub-page__history-results {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.revision-hub-page__history-results
+.revision-hub-page__history-item {
+    margin-bottom: 0;
+}
+
+.revision-hub-page__history-empty {
+    padding: 25px 12px;
+    text-align: center;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.revision-hub-page__history-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.revision-hub-page__history-pagination p {
+    margin: 0;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.revision-hub-page__history-pagination > div {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.revision-hub-page__history-pagination span {
+    color: #334155;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.revision-hub-page__history-pagination button {
+    padding: 9px 13px;
+}
+
+@media (max-width: 600px) {
+    .revision-hub-page__history-filters select {
+        flex: 1 1 100%;
+    }
+
+    .revision-hub-page__history-pagination {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .revision-hub-page__history-results
+    .revision-hub-page__history-item {
+        flex-wrap: wrap;
+    }
+}
+
