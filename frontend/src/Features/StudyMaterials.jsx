@@ -127,7 +127,7 @@ function StudyMaterials() {
 
             if (!response.ok) {
                 if (response.status === 403) {
-                    throw new Error("You are not authorised to access modules. Please contact the administrator.");
+                    throw new Error("Unable to load modules at the moment. Please try again later or contact support.");
                 }
                 throw new Error(`Could not load modules (Status: ${response.status})`);
             }
@@ -421,6 +421,7 @@ function StudyMaterials() {
                                     </p>
                                     <button
                                         type="button"
+                                        className="study-materials-page__retry-btn"
                                         onClick={loadModules}
                                     >
                                         Retry Loading Modules
