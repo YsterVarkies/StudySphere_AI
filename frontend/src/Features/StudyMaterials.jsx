@@ -57,10 +57,13 @@ function StudyMaterials() {
     const fileInputRef = useRef(null);
     const [documents, setDocuments] = useState([]); //list of all loaded docuemnts
     const [modules, setModules] = useState([]); // list of available modules
+    const [modulesLoading, setModulesLoading] = useState(false); // loading state for module fetch
+    const [modulesError, setModulesError] = useState(""); // error message for module fetch
     const [selectedModule, setSelectedModule] = useState(""); // filter selection for module view
     const [searchTerm, setSearchTerm] = useState(""); //search input filter
     const [selectedFile, setSelectedFile] = useState(null); // file staged for upload
     const [moduleId, setModuleId] = useState(""); // target module for upload modal
+    const [moduleSearch, setModuleSearch] = useState(""); // search term for module dropdown
     const [title, setTitle] = useState(""); // custom title for document upload
     const [loading, setLoading] = useState(false); // loading state for doucent fetch
     const [uploading, setUploading] = useState(false); // upload network request state
@@ -110,6 +113,10 @@ function StudyMaterials() {
      * fetches available modules from the backend API
      */
     async function loadModules() {
+
+        setModulesLoading(true);// set loading state for modules
+        setModulesError(""); // clear any previous module fetch errors
+
         try {
             const token = getToken(); // token retrieval
             const response = await fetch(`${API_URL}/modules`, {
@@ -117,16 +124,29 @@ function StudyMaterials() {
                     Authorization: token ? `Bearer ${token}` : "", //authorization header
                 },
             });
+
             if (!response.ok) {
+                if (response.status === 403) {
+                    throw new Error("You are not authorised to access modules. Please contact the administrator.");
+                }
                 throw new Error(`Could not load modules (Status: ${response.status})`);
             }
+
             const data = await response.json();
             const list = data.modules || data.data || (Array.isArray(data) ? data : []);
+
+            if (!Array.isArray(list)) {
+                throw new Error("Invalid module list received.");
+            }
+
             setModules(list);
 
         } catch (error) {
             console.error("Load modules error: ", error);
-            setError(error.message || "An error occurred while loading modules");
+            setModules([]); // clear modules on error
+            setModulesError(error.message || "An error occurred while loading modules");
+        } finally {
+            setModulesLoading(false); // reset loading state
         }
     }
 
@@ -178,12 +198,15 @@ function StudyMaterials() {
         }
         // match selected module option against id, module_id, or code to ensure correct linkage
         const foundModule = modules.find(
-            (mod) => String(mod.id || mod.module_id || mod.code) === String(activeModuleId)
+            (mod) => String(mod.module_id ?? mod.id) === String(activeModuleId)
         );
+
+        if (!foundModule) {
+            setError("Please select a valid module from the list.");
+            return;
+        }
         // resolve the precise identifier required by the backend database foreign key column
-        const targetModuleValue = foundModule
-            ? (foundModule.id || foundModule.module_id || foundModule.code)
-            : activeModuleId;
+        const targetModuleValue = foundModule.module_id ?? foundModule.id;
 
         setUploading(true);
         setError("");
@@ -215,6 +238,7 @@ function StudyMaterials() {
             setMessage("Document uploaded successfully!");
             setSelectedFile(null);
             setModuleId("");
+            setModuleSearch("");
             setTitle("");
 
             // refresh document list after successful upload 
@@ -226,7 +250,7 @@ function StudyMaterials() {
             setUploading(false);
         }
     }
-/* OPEN DOCUMENT */
+    /* OPEN DOCUMENT */
     async function handleOpenDocument(document) {
         const documentId = document.document_id || document.id;
 
@@ -285,15 +309,22 @@ function StudyMaterials() {
         if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     }
+    // filter modules based on search keywords
+    const filteredModules = modules.filter((module) => {
+        const search = moduleSearch.trim().toLowerCase();
+        const name = String(module.module_name ?? module.name ?? module.title ?? "").toLowerCase();
+        const code = String(module.module_code ?? module.code ?? "").toLowerCase();
+        return name.includes(search) || code.includes(search);
+    });
 
     //filter documents based on search keywords and selected module criteria
     const filteredDocuments = documents.filter((document) => {
         const name = getDocumentName(document).toLowerCase();
         const documentModuleId = String(
-            document.module_id ||
-            document.moduleId ||
-            document.moduleCode ||
-            document.code ||
+            document.module_id ??
+            document.moduleId ??
+            document.moduleCode ??
+            document.code ??
             ""
         );
         const matchesSearch = name.includes(searchTerm.toLowerCase());
@@ -381,42 +412,77 @@ function StudyMaterials() {
 
                         <div className="study-materials-module">
                             <label htmlFor="study-materials-module">Module</label>
-                            {modules.length > 0 ? (
-                                <select
-                                    id="study-materials-module"
-                                    value={moduleId}
-                                    onChange={(event) => setModuleId(event.target.value)}
-                                >
-                                    <option value="">Select a Module</option>
-                                    {modules.map((module) => {
-                                        // Prioritize relational DB keys (id/module_id) falling back to code
-                                        const modId = module.id || module.module_id || module.code;
-                                        const name = module.name || module.module_name || module.title || "Unnamed Module";
-                                        const code = module.code || module.module_code || "";
-
-                                        if (!modId) return null;
-                                        return (
-                                            <option key={modId} value={modId}>
-                                                {name} {code ? `(${code})` : ''}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
+                            {modulesLoading ? (
+                                <p>Loading modules...</p>
+                            ) : modulesError ? (
+                                <div>
+                                    <p className="study-materials-page__error">
+                                        {modulesError}
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={loadModules}
+                                    >
+                                        Retry Loading Modules
+                                    </button>
+                                </div>
+                            ) : modules.length === 0 ? (
+                                <div>
+                                    <p>No modules are available</p>
+                                    <button
+                                        type="button"
+                                        onClick={loadModules}
+                                    >
+                                        Refresh Modules
+                                    </button>
+                                </div>
                             ) : (
-                                <input
-                                    id="study-materials-module"
-                                    type="text"
-                                    value={moduleId}
-                                    onChange={(event) => setModuleId(event.target.value)}
-                                    placeholder="Enter Module ID"
+                                <>
+                                <input 
+                                type="search"
+                                placeholder="Search modules by name or code..."
+                                value={moduleSearch}
+                                onChange={(event) => {
+                                    setModuleSearch(event.target.value);
+                                    setModuleId("");
+                                }}
                                 />
+                                <select 
+                                id="study-materials-module"
+                                value={moduleId} 
+                                onChange={(event) => setModuleId(event.target.value)}
+                                > 
+                                <option value="">Select a Module</option>
+                                {filteredModules.map((module) => {
+                                    const modId = module.module_id ?? module.id;
+                                    const name = module.name ?? module.module_name ?? module.title ?? "Unnamed Module";
+                                    const code = module.code ?? module.module_code ?? "";
+
+                                    if (modId == null) return null;
+
+                                    return (
+                                        <option key={modId} value={modId}>
+                                            {name} {code ? `(${code})` : ''}
+                                        </option>
+                                    );
+                                })}
+                                </select>
+                                {filteredModules.length === 0 && (
+                                    <p>No modules match your search.</p>
+                                )}
+                                </>
                             )}
                         </div>
                         <div className="study-materials-page__modal-actions">
                             <button
                                 type="button"
                                 className="study-materials-page__btn-cancel"
-                                onClick={() => setSelectedFile(null)}
+                                onClick = {() => {
+                                    setSelectedFile(null);
+                                    setModuleId("");
+                                    setModuleSearch("");
+                                    setTitle("");
+                                }}
                             >
                                 Cancel
                             </button>
@@ -424,7 +490,12 @@ function StudyMaterials() {
                                 type="button"
                                 className="study-materials-page__btn-confirm"
                                 onClick={() => handleUpload()}
-                                disabled={uploading || !moduleId}
+                                disabled={
+                                    uploading ||
+                                    modulesLoading ||
+                                    !!modulesError ||
+                                    !modules.some((module) => String(module.module_id ?? module.id) === String(moduleId))
+                                }
                             >
                                 {uploading ? "Uploading..." : "Upload Document"}
                             </button>
@@ -437,9 +508,9 @@ function StudyMaterials() {
                 <select value={selectedModule} onChange={(event) => setSelectedModule(event.target.value)}>
                     <option value="">All Modules</option>
                     {modules.map((module) => {
-                        const modId = module.id || module.module_id || module.code;
-                        const name = module.name || module.module_name || module.title || "Unnamed Module";
-                        const code = module.code || module.module_code || "";
+                        const modId = module.module_id ?? module.id;
+                        const name = module.name ?? module.module_name ?? module.title ?? "Unnamed Module";
+                        const code = module.code ?? module.module_code ?? "";
 
                         if (!modId) return null;
                         return (
@@ -468,7 +539,7 @@ function StudyMaterials() {
                 ) : (
                     <>
                         {filteredDocuments.map((document) => {
-                            const docId = document.document_id || document.id;
+                            const docId = document.document_id ?? document.id;
 
                             return (
                                 <article className="study-materials-page__document" key={docId}>
@@ -477,7 +548,7 @@ function StudyMaterials() {
                                             <div className="study-materials-page__document-icon">📄</div>
                                             <div className="study-materials-page__document-info">
                                                 <h3>{getDocumentName(document)}</h3>
-                                                <p>{getDocumentModule(document)} · {formatFileSize(document.file_size || document.size)}</p>
+                                                <p>{getDocumentModule(document)} · {formatFileSize(document.file_size ?? document.size)}</p>
 
                                             </div>
                                         </div>
