@@ -72,13 +72,12 @@ const createUser = async (
     studentNumber,
     email,
     passwordHash,
-    yearOfStudy,
     role
 ) => {
     const [result] = await db.query(
         `INSERT INTO \`USER\`
-        (cohort_id, first_name, last_name, student_number, email, password_hash, year_of_study, role, is_active, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())`,
+        (cohort_id, first_name, last_name, student_number, email, password_hash, role, is_active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW())`,
         [
             cohortId,
             firstName,
@@ -86,7 +85,6 @@ const createUser = async (
             studentNumber,
             email,
             passwordHash,
-            yearOfStudy,
             role
         ]
     );
