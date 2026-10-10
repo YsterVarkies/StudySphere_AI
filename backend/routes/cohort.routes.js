@@ -2,6 +2,10 @@
 const express = require("express");
 const router = express.Router();
 
+const {
+    authenticateToken,
+    requireRole
+} = require("../middleware/auth.middleware");
 const cohortController = require("../controllers/cohort.controller");
 
 const {
