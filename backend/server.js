@@ -1,4 +1,3 @@
-
 const path = require("path");
 require("dotenv").config({
     path: path.resolve(__dirname, ".env")
@@ -29,6 +28,7 @@ async function testDatabaseConnection() {
 }
 
 const { authenticateToken, requireRole } = require("./middleware/auth.middleware");
+const profileController = require("./controllers/profile.controller");
 
 // ROUTES
 
@@ -69,6 +69,13 @@ app.use("/api/quizzes", quizRoutes);
 // AI Chat
 const aiChatRoutes = require("./src/routes/aiChat.routes");
 app.use("/api/chat", aiChatRoutes);
+
+// Student profile update 
+app.put(
+    "/api/users/profile",
+    authenticateToken,
+    profileController.updateProfile
+);
 
 
 //Admin
