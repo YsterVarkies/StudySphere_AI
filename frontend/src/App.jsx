@@ -5,6 +5,7 @@ import { loginUser, registerUser } from './services/auth.service'
 import StudyMaterials from './Features/StudyMaterials'
 import AIChat from './Features/AIChat'
 import RevisionHub from './Features/RevisionHub'
+import ProfileSettings from './Features/ProfileSettings';
 import { useEffect, useState } from 'react'
 import './App.css'
 
@@ -932,7 +933,7 @@ function App() {
   const isAdministrator = currentUser.role === 'admin'
   const currentNav = (isAdministrator
     ? ['analytics', 'users', 'modules', 'announcements']
-    : ['dashboard', 'study-materials', 'ai-chat', 'revision', 'planner']
+    : ['dashboard', 'study-materials', 'ai-chat', 'revision', 'planner', 'profile']
   ).includes(activeNav) ? activeNav : isAdministrator ? 'analytics' : 'dashboard'
   const firstName = currentUser.firstName.trim()
   const surname = currentUser.surname?.trim() || ''
@@ -996,7 +997,21 @@ function App() {
               <span className="nav-icon planner"></span>
               Study planner
             </button>
-          </div>}
+
+            <button
+              className={`nav-item ${currentNav === 'profile' ? 'active' : ''}`}
+              type="button"
+              onClick={() => setActiveNav('profile')}
+            >
+              <span className="nav-icon profile">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', verticalAlign: 'middle' }}>
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </span>
+              Profile &amp; Settings
+            </button>
+            </div>}
 
           {isAdministrator && <div className="nav-group">
             <p className="nav-label">Administrator</p>
@@ -1115,7 +1130,8 @@ function App() {
           <AIChat />
         ): currentNav === 'revision' ? (
           <RevisionHub />
-
+        ) : currentNav === 'profile' ? (
+          <ProfileSettings user={currentUser} onUpdateUser={setUser} />
         ) : currentNav === 'analytics' ? (
           <AnalyticsDashboard />
         ) : currentNav === 'users' ? (
