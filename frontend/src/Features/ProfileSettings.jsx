@@ -4,7 +4,7 @@ export default function ProfileSettings({ user, onUpdateUser }) {
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',
     surname: user?.surname || '',
-    studentNumber: user?.studentNumber || '',
+    studentNumber: user?.studentNumber || user?.student_number || '',
     email: user?.email || '',
     yearOfStudy: user?.year_of_study || 3,
     cohortId: user?.cohort_id || '',
@@ -141,6 +141,7 @@ export default function ProfileSettings({ user, onUpdateUser }) {
                 type="text" 
                 value={formData.studentNumber} 
                 onChange={(e) => updateField('studentNumber', e.target.value)} 
+                placeholder="Enter student number"
                 required 
                 style={{ width: '100%', padding: '12px', marginTop: '8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '1rem' }}
               />
