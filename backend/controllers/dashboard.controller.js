@@ -1,5 +1,6 @@
 const Dashboard = require("../models/dashboard.model");
 
+
 const getDashboard = async (req, res) => {
     try {
         const dashboard = await Dashboard.getDashboardData(req.user);
