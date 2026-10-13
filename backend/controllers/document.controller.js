@@ -1,4 +1,5 @@
 const Document = require("../models/document.model");
+const db = require("../config/db");
 const storage = require("../config/storage");
 const {
     PutObjectCommand,
@@ -82,6 +83,54 @@ const createDocument = async (req, res) => {
             });
         }
 
+        
+        // Validate the module ID
+        const parsedModuleId = Number(moduleId);
+
+        if (!Number.isInteger(parsedModuleId) || parsedModuleId <= 0) {
+            return res.status(400).json({
+                message: "Please provide a valid module ID."
+            });
+        }
+
+        // Confirm that the module exists
+        const [moduleRows] = await db.query(
+            `SELECT module_id
+             FROM \`MODULE\`
+             WHERE module_id = ?`,
+            [parsedModuleId]
+        );
+
+        if (moduleRows.length === 0) {
+            return res.status(404).json({
+                message: "The selected module does not exist."
+            });
+        }
+
+        // Students may upload only to modules assigned to their cohort
+        if (req.user.role === "student") {
+            const [accessRows] = await db.query(
+                `SELECT m.module_id
+                 FROM \`USER\` u
+                 INNER JOIN COHORT_MODULE cm
+                     ON cm.cohort_id = u.cohort_id
+                 INNER JOIN \`MODULE\` m
+                     ON m.module_id = cm.module_id
+                 WHERE u.user_id = ?
+                   AND u.role = 'student'
+                   AND m.module_id = ?
+                 LIMIT 1`,
+                [userId, parsedModuleId]
+            );
+
+            if (accessRows.length === 0) {
+                return res.status(403).json({
+                    message: "You do not have access to this module."
+                });
+            }
+        }
+
+
         const file = req.file;
 
         // Create a unique file name
@@ -109,7 +158,7 @@ const createDocument = async (req, res) => {
         // Store document metadata in MySQL
         const result = await Document.createDocument(
             userId,
-            moduleId,
+            parsedModuleId,
             title,
             filePath,
             file.mimetype,

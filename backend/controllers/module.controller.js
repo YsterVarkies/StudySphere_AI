@@ -3,7 +3,10 @@ const db = require('../config/db');
 
 const getModules = async (req, res) => {
     try {
-        const modules = await Module.getAllModules();
+        const modules = await Module.getAllModules(
+            req.user.user_id,
+            req.user.role
+        );
         
 
         const formattedModules = modules.map(m => ({
