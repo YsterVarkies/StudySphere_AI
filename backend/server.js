@@ -84,8 +84,8 @@ app.get("/api/cohorts/public", cohortController.getCohorts);
 
 app.use("/api/analytics", authenticateToken, requireRole("admin"), analyticsRoutes);
 app.use("/api/users", authenticateToken, requireRole("admin"), userRoutes);
-app.use("/api/modules", authenticateToken, requireRole("admin"), moduleRoutes); 
-app.use("/api/cohorts", authenticateToken, requireRole("admin"), cohortRoutes);;
+app.use("/api/modules", authenticateToken, moduleRoutes); 
+app.use("/api/cohorts", authenticateToken, cohortRoutes);
 //End Admin Code
 
 
