@@ -71,6 +71,8 @@ function RevisionHub() {
     const [historySearch, setHistorySearch] = useState(""); //stores the search term for filtering saved quizzes/flashcards
     const [historyFilter, setHistoryFilter] = useState("all"); //stores the filter for saved quizzes/flashcards (all, quizzes, flashcards)
     const [historyPage, setHistoryPage] = useState(1); //stores the current page of saved quizzes/flashcards
+    const [deleteRevision, setDeleteRevision] = useState(null); //remebers the selected quiz or flashcard
+    const [deletingRevision, setDeletingRevision] = useState(false); //track delete request
 
     /* Load Documents when Component Starts */
     useEffect(() => {
@@ -162,6 +164,52 @@ function RevisionHub() {
             setHistoryLoading(false);
         }
     }
+
+    /* Delete a saved quiz or flashcard set from the backend */
+    async function handleDeleteRevision() { //Creates a funtion that can wait for the backend's response
+        if (!deleteRevision || deletingRevision) return; //stops the function if no revision is selected or deletion is already running.
+
+        const { type, id } = deleteRevision; //extracts the revision type and database ID from the selected item.
+
+        if (!id || !["quiz", "flashcards"].includes(type)) { //check if selected document is valid
+            setHistoryError("Could not identify the revision to delete.");
+            return;
+        }
+        setDeletingRevision(true); //prevent duplicate requests 
+        setHistoryError("");
+
+        try {
+            const token = getToken(); // gets the logged-in user's auhtentication token
+
+            if (!token) {
+                throw new Error("Please log in again to delete revisions.");
+            }
+
+            const endpoint = type === "quiz" ? `${API_URL}/quizzes/${id}` : `${API_URL}/flashcards/${id}`; //gets the correct backend endpoint
+
+            const response = await fetch(endpoint, {
+                method: "DELETE", //tells backend to delete the selected item
+                headers: {
+                    Authorization: `Bearer ${token}`, //sends user authentication token with request
+                },
+            });
+
+            if (!response.ok) { //checks if the backend rejected the delettion
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || `Unable to delete revision (Status: ${response.status})`);
+            }
+
+            await loadPreviousRevision(); //Refreshes the saved revisions list
+            setDeleteRevision(null); //close confirmation popup
+        } catch (error) {
+            console.error("Delete revision error: ", error);
+            setHistoryError(error.message || "Unable to delete revision.");
+            setDeleteRevision(null); //close popup when deletion fails.
+        } finally {
+            setDeletingRevision(false);
+        }
+    }
+
 
     /* Open a Previously Saved Revision Content */
     async function openSavedRevision(type, id) {
@@ -775,6 +823,34 @@ function RevisionHub() {
                                                 ? "Open Quiz"
                                                 : "Open Flashcards"}
                                     </button>
+                                    {/* Delete saved quiz or flashcard */}
+                                    <button
+                                        type="button"
+                                        className="revision-hub-page__delete-btn"
+                                        onClick={() => setDeleteRevision(revision)}
+                                        aria-label={`Delete ${revision.title}`} //makes the icon-only button understandable to screen readers
+                                        title="Delete revision" //tooltip when mouse hovers over it
+                                    >
+                                        <svg //draws the trash-can icon without an external library
+                                            width="18"
+                                            height="18"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="1.8"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            aria-hidden="true"
+                                        >
+                                            {/* draws the individual lines of the trash can */}
+                                            <path d="M3 6h18" />
+                                            <path d="M8 6V4h8v2" />
+                                            <path d="M5 6l1 15h12l1-15" />
+                                            <path d="M10 10v7" />
+                                            <path d="M14 10v7" />
+                                        </svg>
+
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -827,6 +903,46 @@ function RevisionHub() {
                 )}
             </section>
 
+               {/*  Delete Revision Confirmation Popup  */}
+               {deleteRevision && (
+                <div className="revision-hub-page__modal-backdrop">
+                    <div 
+                    className="revision-hub-page__delete-modal"
+                    role="alertdialog" //identifies the popup as an important confirmation dialog
+                    aria-modal="true" // tells assistive tech that the dialog is modal
+                    aria-labelledby="delete-revision-title" //connects the dialog to its heading
+                    >
+                        <h2 id="delete-revision-title">
+                            Delete {deleteRevision.type === "quiz" ? "Quiz" : "Flashcard"}? {/* changes heading based on what is selected */}
+                        </h2>
+                        <p>
+                            Are you sure you want to delete{" "}
+                            <strong>{deleteRevision.title}</strong> {/* displays the quiz/flashcard name */}
+                        </p>
+                        <p className="revision-hub-page__delete-warning">
+                            ⚠️ This action cannot be undone.
+                        </p>
+                        <div className="revision-hub-page__modal-actions">
+                            <button
+                            type="button"
+                            className="revision-hub-page__btn-cancel"
+                            onClick={() => setDeleteRevision(null)}
+                            disabled={deletingRevision} //prevent repeated button clicks
+                            >
+                                Cancel
+                            </button>
+                            <button
+                            type="button"
+                            className="revision-hub-page__btn-delete-confirm"
+                            onClick={handleDeleteRevision}
+                            disabled={deletingRevision}
+                            >
+                                {deletingRevision ? "Deleting..." : "Yes, Delete"} {/* change the text on the button */}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+               )}
 
             {/* ERROR MESSAGE */}
             {error && (

@@ -67,6 +67,8 @@ function StudyMaterials() {
     const [title, setTitle] = useState(""); // custom title for document upload
     const [loading, setLoading] = useState(false); // loading state for doucent fetch
     const [uploading, setUploading] = useState(false); // upload network request state
+    const [deleteDoc, setDeleteDoc] = useState(null);//remeber which document is selected for deletion
+    const [deleting, setDeleting] = useState(false); // track the deletion request
     const [error, setError] = useState(""); // error message banner
     const [message, setMessage] = useState(""); // success message banner
     const [activeView, setActiveView] = useState("list"); // view toggle: "list" or "chat"
@@ -250,6 +252,55 @@ function StudyMaterials() {
             setUploading(false);
         }
     }
+
+    /*  Delete a document form the backend database */
+    async function handleDeleteDocument() { // creates an asynchronous function because deleting a document requires communication with the backend
+        if (!deleteDoc || deleting) return; //stops the function if no document was selected or a deletion is already in progress
+
+        const documentId = deleteDoc.document_id ?? deleteDoc.id; //Gets the selected document's database ID
+
+        if (!documentId) { // Checks the document ID
+            setError("Could not identify the document to delete.");
+            return;
+        }
+
+        setDeleting(true); //marks the deletion as in progress
+        setError(""); //clears previous error
+        setMessage(""); // Clears previous success message
+
+        try {
+            const token = getToken();
+
+            if (!token) {
+                throw new Error("Please log in again to delete documents.");
+            }
+
+            const response = await fetch(`${API_URL}/documents/${documentId}`, { //backend request
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (!response.ok) { //check if backend accepted the request
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || `Unable to delete document (Status: ${response.status})`);
+            }
+
+            setDeleteDoc(null); //Clears selected document and close confirmation popup
+            await loadDocuments(); //fetch updated list from database
+            setMessage("Document deleted successfully.");
+
+        } catch (error) {
+            console.error("Delete document error: ", error);
+            setError(error.message || "Unable to delete document.");
+            setDeleteDoc(null); //close popup when deletion fails
+        } finally {
+            setDeleting(false);
+        }
+    }
+
+
     /* OPEN DOCUMENT */
     async function handleOpenDocument(document) {
         const documentId = document.document_id || document.id;
@@ -439,38 +490,38 @@ function StudyMaterials() {
                                 </div>
                             ) : (
                                 <>
-                                <input 
-                                type="search"
-                                placeholder="Search modules by name or code..."
-                                value={moduleSearch}
-                                onChange={(event) => {
-                                    setModuleSearch(event.target.value);
-                                    setModuleId("");
-                                }}
-                                />
-                                <select 
-                                id="study-materials-module"
-                                value={moduleId} 
-                                onChange={(event) => setModuleId(event.target.value)}
-                                > 
-                                <option value="">Select a Module</option>
-                                {filteredModules.map((module) => {
-                                    const modId = module.module_id ?? module.id;
-                                    const name = module.name ?? module.module_name ?? module.title ?? "Unnamed Module";
-                                    const code = module.code ?? module.module_code ?? "";
+                                    <input
+                                        type="search"
+                                        placeholder="Search modules by name or code..."
+                                        value={moduleSearch}
+                                        onChange={(event) => {
+                                            setModuleSearch(event.target.value);
+                                            setModuleId("");
+                                        }}
+                                    />
+                                    <select
+                                        id="study-materials-module"
+                                        value={moduleId}
+                                        onChange={(event) => setModuleId(event.target.value)}
+                                    >
+                                        <option value="">Select a Module</option>
+                                        {filteredModules.map((module) => {
+                                            const modId = module.module_id ?? module.id;
+                                            const name = module.name ?? module.module_name ?? module.title ?? "Unnamed Module";
+                                            const code = module.code ?? module.module_code ?? "";
 
-                                    if (modId == null) return null;
+                                            if (modId == null) return null;
 
-                                    return (
-                                        <option key={modId} value={modId}>
-                                            {name} {code ? `(${code})` : ''}
-                                        </option>
-                                    );
-                                })}
-                                </select>
-                                {filteredModules.length === 0 && (
-                                    <p>No modules match your search.</p>
-                                )}
+                                            return (
+                                                <option key={modId} value={modId}>
+                                                    {name} {code ? `(${code})` : ''}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                    {filteredModules.length === 0 && (
+                                        <p>No modules match your search.</p>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -478,7 +529,7 @@ function StudyMaterials() {
                             <button
                                 type="button"
                                 className="study-materials-page__btn-cancel"
-                                onClick = {() => {
+                                onClick={() => {
                                     setSelectedFile(null);
                                     setModuleId("");
                                     setModuleSearch("");
@@ -504,6 +555,46 @@ function StudyMaterials() {
                     </div>
                 </div>
             )}
+            {/* Delete Document Confirmation Popup */}
+            {deleteDoc && ( //display popup when document is selected for deletion
+                <div className="study-materials-page__modal-backdrop">
+                    <div
+                        className="study-materials-page__modal study-materials-page__delete-modal"
+                        role="alertdialog" //confirmation dialog
+                        aria-modal="true" //indicates that the popup requires the user's attention
+                        aria-labelledby="delete-document-title" //connects dialog to its heading for accessibility
+                    >
+                        <h2 id="delete-document-title">Delete Document?</h2>
+                        <p>Are you sure you want to delete{" "}
+                            <strong>{getDocumentName(deleteDoc)}</strong>? {/* Shows the name of the document selected for deletion */}
+                        </p>
+                        <p className="study-materials-page__delete-warning">
+                            ⚠️ This action cannot be undone.
+                        </p>
+
+                        <div className="study-materials-page__modal-actions">
+                            <button
+                                type="button"
+                                className="study-materials-page__btn-cancel"
+                                onClick={() => setDeleteDoc(null)} // close popup when cancel is clicked
+                                disabled={deleting} //prevent clicking buttons repeatedly during deletion
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                className="study-materials-page__btn-delete-confirm"
+                                onClick={handleDeleteDocument} //calls funtion handleDeleteDocument
+                                disabled={deleting}
+                            >
+                                {deleting ? "Deleting..." : "Yes, Delete"} {/* change button text while the request is processing */}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Filter controls section (Module Dropdown & Search Baer) */}
             <section className="study-materials-page__controls">
                 <select value={selectedModule} onChange={(event) => setSelectedModule(event.target.value)}>
@@ -550,8 +641,32 @@ function StudyMaterials() {
                                             <div className="study-materials-page__document-info">
                                                 <h3>{getDocumentName(document)}</h3>
                                                 <p>{getDocumentModule(document)} · {formatFileSize(document.file_size ?? document.size)}</p>
-
                                             </div>
+                                            <button
+                                                type="button"
+                                                className="study-materials-page__delete-btn"
+                                                onClick={() => setDeleteDoc(document)}
+                                                aria-label={`Delete ${getDocumentName(document)}`}
+                                                title="Delete document"
+                                            >
+                                                <svg
+                                                    width="18"
+                                                    height="18"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="1.8"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M3 6h18" />
+                                                    <path d="M8 6V4h8v2" />
+                                                    <path d="M5 6l1 15h12l1-15" />
+                                                    <path d="M10 10v7" />
+                                                    <path d="M14 10v7" />
+                                                </svg>
+                                            </button>
                                         </div>
                                     </div>
 
