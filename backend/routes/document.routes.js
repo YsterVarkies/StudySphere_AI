@@ -13,7 +13,8 @@ const {
     getDocuments,
     getDocument,
     createDocument,
-    downloadDocument
+    downloadDocument,
+    deleteDocument
 } = require("../controllers/document.controller");
 
 // Get all documents for the logged-in user
@@ -55,5 +56,7 @@ router.post(
     },
     createDocument
 );
+// Permanently delete a document belonging to the logged-in user
+router.delete("/:id", authenticateToken, deleteDocument);
 
 module.exports = router;
