@@ -173,7 +173,8 @@
 }
 
 .study-materials-page__document-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 18px;
   width: 100%;
@@ -523,4 +524,79 @@
   .study-materials-page__document-actions {
     gap: 6px;
   }
+}
+
+/* Delete confirmation button */
+.study-materials-page__btn-delete-confirm {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 7px;
+  background: #dc2626;
+  color:#ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.study-materials-page__btn-delete-confirm:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.study-materials-page__btn-delete-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Style and position the document Delete button */
+.study-materials-page__delete-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    background: #fff5f5;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.study-materials-page__delete-btn:hover {
+    background: #fee2e2;
+    border-color: #dc2626;
+}
+
+/* Give the delete popup a stronger appearance */
+.study-materials-page__delete-modal {
+    max-width: 430px;
+    border-top: 5px solid #dc2626;
+    box-shadow: 0 20px 60px rgba(10, 32, 61, 0.3);
+}
+
+/* Make the popup heading more noticeable */
+.study-materials-page__delete-modal h2 {
+    font-size: 21px;
+    font-weight: 700;
+    color: #0a203d;
+    margin-bottom: 18px;
+}
+
+/* Improve the readability of the popup text */
+.study-materials-page__delete-modal p {
+    line-height: 1.6;
+    color: #334155;
+}
+
+/* Highlight the permanent deletion warning */
+.study-materials-page__delete-warning {
+    background: #fff1f2;
+    border: 1px solid #fecdd3;
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: #b91c1c;
+    font-weight: 600;
+    margin-top: 18px;
 }
