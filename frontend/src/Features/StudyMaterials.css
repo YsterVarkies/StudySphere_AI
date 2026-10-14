@@ -591,6 +591,7 @@
 }
 
 /* Highlight the permanent deletion warning */
+.study-materials-page__delete-modal 
 .study-materials-page__delete-warning {
     background: #fff1f2;
     border: 1px solid #fecdd3;

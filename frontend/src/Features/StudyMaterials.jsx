@@ -294,6 +294,7 @@ function StudyMaterials() {
         } catch (error) {
             console.error("Delete document error: ", error);
             setError(error.message || "Unable to delete document.");
+            setDeleteDoc(null); //close popup when deletion fails
         } finally {
             setDeleting(false);
         }

@@ -833,3 +833,111 @@
     }
 }
 
+/* Delete Revision Confirmation Popup */
+.revision-hub-page__modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 32, 61, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.revision-hub-page__delete-modal {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 430px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border-top: 5px solid #dc2626;
+  box-shadow: 0 20px 60px rgba(10, 32, 61, 0.3);
+}
+
+.revision-hub-page__delete-modal h2 {
+  margin: 0 0 18px;
+  font-size: 21px;
+  font-weight: 700;
+  color: #0a203d;
+}
+
+.revision-hub-page__delete-modal p {
+  color: #334155;
+  line-height: 1.6;
+}
+
+.revision-hub-page__delete-warning {
+  padding: 12px 14px;
+  margin-top: 18px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  color: #b91c1c !important;
+  font-weight: 600;
+}
+
+.revision-hub-page__modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.revision-hub-page__btn-cancel,
+.revision-hub-page__btn-delete-confirm {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.revision-hub-page__btn-cancel {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+}
+
+.revision-hub-page__btn-delete-confirm {
+  background: #dc2626;
+  border: none;
+  color: #ffffff;
+}
+
+.revision-hub-page__btn-delete-confirm:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.revision-hub-page__modal-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Delete button for saved quizzes and flashcards */
+.revision-hub-page__history .revision-hub-page__delete-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff5f5;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.revision-hub-page__history .revision-hub-page__delete-btn:hover:not(:disabled) {
+    background: #fee2e2;
+    border-color: #dc2626;
+}
+
+.revision-hub-page__history .revision-hub-page__delete-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
