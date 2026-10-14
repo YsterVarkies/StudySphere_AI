@@ -1,10 +1,13 @@
 const Document = require("../models/document.model");
 const db = require("../config/db");
 const storage = require("../config/storage");
+
 const {
     PutObjectCommand,
-    GetObjectCommand
+    GetObjectCommand,
+    DeleteObjectCommand
 } = require("@aws-sdk/client-s3");
+
 const crypto = require("crypto");
 
 // Get all documents for the logged-in user
@@ -238,9 +241,75 @@ const downloadDocument = async (req, res) => {
     }
 };
 
+// Permanently delete a document belonging to the logged-in user
+const deleteDocument = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const documentId = Number(req.params.id);
+
+        // Validate the document ID
+        if (!Number.isInteger(documentId) || documentId <= 0) {
+            return res.status(400).json({
+                message: "Please provide a valid document ID."
+            });
+        }
+
+        // Find the document and confirm ownership
+        const document = await Document.getDocumentById(
+            documentId,
+            userId
+        );
+
+        if (!document) {
+            return res.status(404).json({
+                message: "Document not found."
+            });
+        }
+
+        // Delete the actual file from Backblaze B2
+        await storage.send(
+            new DeleteObjectCommand({
+                Bucket: process.env.B2_BUCKET_NAME,
+                Key: document.file_path
+            })
+        );
+
+        // Delete the document record from MySQL
+        const result = await Document.deleteDocument(
+            documentId,
+            userId
+        );
+
+        // Confirm that a database record was deleted
+        if (result.affectedRows === 0) {
+            console.error(
+                `Document ${documentId} was removed from storage, but its database record was not deleted.`
+            );
+
+            return res.status(500).json({
+                message: "The file was removed, but the document record could not be deleted."
+            });
+        }
+
+        return res.status(200).json({
+            message: "Document permanently deleted successfully.",
+            document_id: documentId
+        });
+
+    } catch (error) {
+        console.error("Document deletion error:", error);
+
+        return res.status(500).json({
+            message: "Server error while deleting document."
+        });
+    }
+};
+
+
 module.exports = {
     getDocuments,
     getDocument,
     createDocument,
-    downloadDocument
+    downloadDocument,
+    deleteDocument
 };

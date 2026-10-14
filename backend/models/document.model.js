@@ -86,8 +86,23 @@ const createDocument = async (
     return result;
 };
 
+
+// Permanently delete a document record belonging to a user
+const deleteDocument = async (documentId, userId) => {
+    const [result] = await db.query(
+        `DELETE FROM \`DOCUMENT\`
+         WHERE document_id = ?
+           AND user_id = ?`,
+        [documentId, userId]
+    );
+
+    return result;
+};
+
+
 module.exports = {
     getDocumentsByUser,
     getDocumentById,
-    createDocument
+    createDocument,
+     deleteDocument
 };
