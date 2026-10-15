@@ -6,22 +6,72 @@ const Announcement = require('../models/announcement.model');
  */
 exports.createAnnouncement = async (req, res) => {
   try {
-    // TEMP: auth disabled
-    const createdByUserId = req.body.userId || req.query.userId || 1;
-    const { moduleId, title, content } = req.body;
+    // The user ID comes from the authenticated JWT.
+    const createdByUserId = req.user?.user_id;
 
-    if (!moduleId || !title || !content) {
+    const { moduleId, title, content, category } = req.body;
+
+    const allowedCategories = [
+      'General',
+      'Academic',
+      'Campus',
+      'Deadline',
+    ];
+
+    if (!createdByUserId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authenticated user ID not found',
+      });
+    }
+
+    if (
+      typeof title !== 'string' ||
+      !title.trim() ||
+      typeof content !== 'string' ||
+      !content.trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'moduleId, title and content are required',
+        message: 'Title and content are required',
+      });
+    }
+
+    if (!allowedCategories.includes(category)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a valid announcement category',
+      });
+    }
+
+    // General and Campus announcements apply to all students.
+    const isCampusWide = ['General', 'Campus'].includes(category);
+
+    if (!isCampusWide && !moduleId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Select a module for Academic or Deadline announcements',
+      });
+    }
+
+    const finalModuleId = isCampusWide ? null : Number(moduleId);
+
+    if (
+      finalModuleId !== null &&
+      (!Number.isInteger(finalModuleId) || finalModuleId <= 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a valid module',
       });
     }
 
     const announcementId = await Announcement.create({
-      moduleId,
+      moduleId: finalModuleId,
       createdByUserId,
-      title,
-      content,
+      title: title.trim(),
+      content: content.trim(),
+      category,
     });
 
     const announcement = await Announcement.getById(announcementId);
@@ -33,6 +83,7 @@ exports.createAnnouncement = async (req, res) => {
     });
   } catch (error) {
     console.error('createAnnouncement error:', error);
+
     return res.status(500).json({
       success: false,
       message: 'Failed to create announcement',
@@ -44,11 +95,28 @@ exports.createAnnouncement = async (req, res) => {
  * GET /api/announcements
  * Get all announcements (optional ?moduleId=)
  */
+
 exports.getAnnouncements = async (req, res) => {
   try {
-    const { moduleId } = req.query;
+    const role = req.user?.role?.toLowerCase();
+    const userId = req.user?.user_id;
 
-    const announcements = await Announcement.getAll(moduleId || null);
+    let announcements;
+
+    if (role === 'admin' || role === 'administrator') {
+      const { moduleId } = req.query;
+      announcements = await Announcement.getAll(moduleId || null);
+    } else {
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authenticated user ID not found',
+        });
+      }
+
+      announcements =
+        await Announcement.getVisibleToStudent(userId);
+    }
 
     return res.json({
       success: true,
@@ -56,12 +124,14 @@ exports.getAnnouncements = async (req, res) => {
     });
   } catch (error) {
     console.error('getAnnouncements error:', error);
+
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch announcements',
     });
   }
 };
+
 
 /**
  * GET /api/announcements/:id
