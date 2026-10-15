@@ -5,6 +5,7 @@ const storage = require('../../config/storage');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const MAX_CHATS = 20;
 
 function getUserId(req) {
   return (
@@ -77,6 +78,19 @@ exports.createSession = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Unauthorized',
+      });
+    }
+
+    const current = await AiChat.countSessionsByUser(userId);
+    if (current >= MAX_CHATS) {
+      return res.status(403).json({
+        success: false,
+        code: 'LIMIT_REACHED',
+        resource: 'chat',
+        limit: MAX_CHATS,
+        current,
+        message:
+          'You have reached the maximum of 20 saved chats. Delete an existing chat to create a new one.',
       });
     }
 

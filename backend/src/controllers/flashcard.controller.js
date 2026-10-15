@@ -5,6 +5,7 @@ const storage = require('../../config/storage');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const MAX_FLASHCARD_SETS = 20;
 
 function getUserId(req) {
   return req.user?.user_id ||
@@ -92,6 +93,21 @@ exports.generateFlashcards = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Unauthorized'
+      });
+    }
+
+    const current =
+      await Flashcard.countSetsByUser(userId);
+
+    if (current >= MAX_FLASHCARD_SETS) {
+      return res.status(403).json({
+        success: false,
+        code: 'LIMIT_REACHED',
+        resource: 'flashcard',
+        limit: MAX_FLASHCARD_SETS,
+        current,
+        message:
+          'You have reached the maximum of 20 saved flashcard sets. Delete an existing set to create a new one.'
       });
     }
 
