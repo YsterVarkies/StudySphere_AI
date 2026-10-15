@@ -568,14 +568,16 @@ function RevisionHub() {
     function nextQuestion() {
         if (currentQuestion < questions.length - 1) {
             setCurrentQuestion((current) => current + 1);
-            setShowAnswer(false);
+            setSelectedAnswer({}) //clear previous answer selections
+            setShowAnswer(false); // hide the correct answer
         }
     }
 
     function previousQuestion() {
         if (currentQuestion > 0) {
             setCurrentQuestion((current) => current - 1);
-            setShowAnswer(false);
+            setSelectedAnswer({}) //clear prevoius answer selections
+            setShowAnswer(false); //hide the correct answer
         }
     }
 
@@ -1073,9 +1075,17 @@ function RevisionHub() {
                         <button
                             type="button"
                             className="revision-hub-page__answer-button"
-                            onClick={() =>
-                                setShowAnswer((current) => !current)
-                            }
+                            onClick={() =>{
+                                if (showAnswer) {
+                                    //clear the selection when hiding the answer
+                                    setSelectedAnswer((previous) => {
+                                        const updated = {...previous};
+                                        delete updated[currentQuestion];
+                                        return updated;
+                                    });
+                                }
+                                setShowAnswer((current) => !current);
+                            }}
                         >
                             {showAnswer
                                 ? "Hide answer"
