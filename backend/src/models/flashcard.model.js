@@ -1,6 +1,14 @@
 const db = require('../../config/db');
 
 const Flashcard = {
+  async countSetsByUser(userId) {
+    const [rows] = await db.execute(
+      `SELECT COUNT(*) AS total FROM FLASHCARD_SET WHERE user_id = ?`,
+      [userId]
+    );
+    return Number(rows[0].total);
+  },
+
   async createSetWithCards({ userId, moduleId, documentId, title, cards }) {
     const connection = await db.getConnection();
     try {

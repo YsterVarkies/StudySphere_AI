@@ -10,6 +10,14 @@ const AiChat = {
     return result.insertId;
   },
 
+  async countSessionsByUser(userId) {
+    const [rows] = await db.execute(
+      `SELECT COUNT(*) AS total FROM CHAT_SESSION WHERE user_id = ?`,
+      [userId]
+    );
+    return Number(rows[0].total);
+  },
+
   async getSessionById(sessionId, userId) {
     const [rows] = await db.execute(
       `SELECT * FROM CHAT_SESSION
