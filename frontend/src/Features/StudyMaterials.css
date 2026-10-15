@@ -24,6 +24,71 @@
   font-size: 18px;
 }
 
+/* Doc storage card */
+.study-materials-page__storage-card {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(10, 32, 61, 0.04);
+}
+
+.study-materials-page__storage-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.study-materials-page__storage-heading h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0a203d;
+}
+
+.study-materials-page__storage-heading span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0a203d;
+}
+
+.study-materials-page__storage-details {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* Doc storage progress bar */
+.study-materials-page__track-storage {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 20px;
+  overflow: hidden;
+  margin: 14px 0 10px;
+}
+
+/* Orange fill showing storage usage */
+.study-materials-page__fill-storage {
+  height: 100%;
+  background: #0a203d;
+  border-radius: 20px;
+  transition: width 0.3 ease;
+}
+
+/* Remaining doc slots */
+.study-materials-page__header .study-materials-page__remaining-storage {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
 .study-materials-page__upload-top-btn {
   display: flex;
   align-items: center;
@@ -110,7 +175,7 @@
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .study-materials-page__document:hover {
-  box-shadow: 0 6px 16px rgba(10, 32, 61, 0.8);
+  box-shadow: 0 6px 16px rgba(10, 32, 61, 0.12);
   transform: translateY(-2px);
 }
 
@@ -167,8 +232,9 @@
 }
 
 .study-materials-page__chat-btn:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #0a203d;
 
 }
 
@@ -286,6 +352,40 @@
   font: inherit;
 }
 
+.study-materials-page__module-count {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #0a203d;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* warming when module reaches its limits */
+.study-materials-page__module-limit-warning {
+  margin: 8px 0 4px;
+  padding: 10px 12px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.study-materials-page__total-limit-warning {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .study-materials-page__modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -295,11 +395,17 @@
 
 .study-materials-page__btn-cancel {
   padding: 8px 16px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #0a203d;
   border-radius: 7px;
   background: #ffffff;
-  color: #64748b;
+  color: #0a203d;
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.study-materials-page__btn-cancel:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #0a203d;
 }
 
 .study-materials-page__btn-confirm {

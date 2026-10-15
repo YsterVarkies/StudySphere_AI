@@ -5,6 +5,8 @@ import "./StudyMaterials.css"; // Import the CSS file for styling
 /* Global configuration constants  */
 const API_URL = "http://localhost:5000/api"; // Backend API base URL
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB file size limit 
+const MAX_DOCUMENTS = 20; // Max documents per student
+const MAX_DOC_PER_MODULE = 5; // max documents per module
 
 //Allowed types for uploaded study materials
 const ALLOWED_TYPES = [
@@ -189,6 +191,12 @@ function StudyMaterials() {
      */
     async function handleUpload(targetModuleId) {
         const activeModuleId = targetModuleId || moduleId;
+        //prevent uploading when overall doc limit reached
+        if (documents.length >= MAX_DOCUMENTS) {
+            setError(`You have reached the maximum of ${MAX_DOCUMENTS} documents. Delete an existing document before uploading another.`);
+            setMessage("");
+            return;
+        }
         if (!selectedFile) {
             setError("Please select a file to upload.");
             return;
@@ -209,6 +217,14 @@ function StudyMaterials() {
         }
         // resolve the precise identifier required by the backend database foreign key column
         const targetModuleValue = foundModule.module_id ?? foundModule.id;
+
+        if (getModuleDocCount(targetModuleValue) >= MAX_DOC_PER_MODULE) {
+            setError(
+                `This module has reached its limit of ${MAX_DOC_PER_MODULE} documents. Delete an existing document before uploading another.`
+            );
+            setMessage("");
+            return;
+        }
 
         setUploading(true);
         setError("");
@@ -368,6 +384,14 @@ function StudyMaterials() {
         return name.includes(search) || code.includes(search);
     });
 
+    //number of uploaded documents
+    const totalDocs = documents.length;
+
+    //Count uploaded docs for a module
+    const getModuleDocCount = (selectedModuleId) => {
+        return documents.filter((document) => String(document.module_id ?? document.moduleId) === String(selectedModuleId)).length;
+    };
+
     //filter documents based on search keywords and selected module criteria
     const filteredDocuments = documents.filter((document) => {
         const name = getDocumentName(document).toLowerCase();
@@ -444,6 +468,12 @@ function StudyMaterials() {
                 <div className="study-materials-page__modal-backdrop">
                     <div className="study-materials-page__modal">
                         <h2>Upload Document</h2>
+                        {totalDocs >= MAX_DOCUMENTS && (
+                            <p className="study-materials-page__module-limit-warning">
+                                Your document storage is full ({totalDocs} / {MAX_DOCUMENTS}).
+                                Delete an existing document before uploading another.
+                            </p>
+                        )}
                         <div className="study-materials-page__selected">
                             <strong>{selectedFile.name}</strong>
                             <span>({formatFileSize(selectedFile.size)})</span>
@@ -519,6 +549,22 @@ function StudyMaterials() {
                                             );
                                         })}
                                     </select>
+
+                                    {moduleId && (
+                                        <>
+                                            <p className="study-materials-page__module-count">
+                                                Documents in this module: {getModuleDocCount(moduleId)} / {MAX_DOC_PER_MODULE}
+                                            </p>
+
+                                            {getModuleDocCount(moduleId) >= MAX_DOC_PER_MODULE && (
+                                                <p className="study-materials-page__module-limit-warning">
+                                                    This module has reached its limit of {MAX_DOC_PER_MODULE} documents.
+                                                    Delete an existing document before uploading another.
+                                                </p>
+                                            )}
+                                        </>
+                                    )}
+
                                     {filteredModules.length === 0 && (
                                         <p>No modules match your search.</p>
                                     )}
@@ -546,7 +592,8 @@ function StudyMaterials() {
                                     uploading ||
                                     modulesLoading ||
                                     !!modulesError ||
-                                    !modules.some((module) => String(module.module_id ?? module.id) === String(moduleId))
+                                    !modules.some((module) => String(module.module_id ?? module.id) === String(moduleId)
+                                    ) || totalDocs >= MAX_DOCUMENTS || getModuleDocCount(moduleId) >= MAX_DOC_PER_MODULE
                                 }
                             >
                                 {uploading ? "Uploading..." : "Upload Document"}
@@ -623,6 +670,34 @@ function StudyMaterials() {
                     />
                 </div>
             </section>
+
+            {/* Doc Storage Card */}
+            <div className="study-materials-page__storage-card">
+                <div className="study-materials-page__storage-heading">
+                    <h2>Document Storage</h2>
+                    <span>{totalDocs} / {MAX_DOCUMENTS} documents</span>
+                </div>
+
+                <div className="study-materials-page__track-storage">
+                    <div
+                        className="study-materials-page__fill-storage"
+                        style={{
+                            width: `${Math.min((totalDocs / MAX_DOCUMENTS) * 100, 100)}%`
+                        }}
+                    />
+                </div>
+
+                <div className="study-materials-page__storage-details">
+                    <span>{Math.round((totalDocs / MAX_DOCUMENTS) * 100)}% used</span>
+                    <span>{Math.max(MAX_DOCUMENTS - totalDocs, 0)} slots remaining</span>
+                </div>
+                {totalDocs >= MAX_DOCUMENTS && (
+                    <p className="study-materials-page__total-limit-warning">
+                        You have reached the maximum of {MAX_DOCUMENTS} documents.
+                        Delete an existing document before uploading another.
+                    </p>
+                )}
+            </div>
 
             {/* Documents Grid/ List Section */}
             <section className="study-materials-page__documents">
