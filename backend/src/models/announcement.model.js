@@ -1,24 +1,24 @@
 const db = require('../../config/db');
 
 const Announcement = {
-  /**
-   * Create a new announcement
-   */
   async create({ moduleId, createdByUserId, title, content }) {
     const [result] = await db.execute(
-      `INSERT INTO ANNOUNCEMENT (module_id, created_by_user_id, title, content, created_at)
+      `INSERT INTO ANNOUNCEMENT
+         (module_id, created_by_user_id, title, content, created_at)
        VALUES (?, ?, ?, ?, NOW())`,
-      [moduleId, createdByUserId, title, content]
+      [moduleId || null, createdByUserId, title, content]
     );
     return result.insertId;
   },
 
-  /**
-   * Get one announcement by ID
-   */
   async getById(announcementId) {
     const [rows] = await db.execute(
-      `SELECT a.*, u.first_name, u.last_name, m.module_name
+      `SELECT
+         a.*,
+         u.first_name,
+         u.last_name,
+         m.module_code,
+         m.module_name
        FROM ANNOUNCEMENT a
        LEFT JOIN USER u ON a.created_by_user_id = u.user_id
        LEFT JOIN MODULE m ON a.module_id = m.module_id
@@ -28,19 +28,23 @@ const Announcement = {
     return rows[0] || null;
   },
 
-  /**
-   * Get all announcements (optionally filter by module)
-   */
-  async getAll(moduleId = null) {
+  async getAll(moduleId = undefined) {
     let query = `
-      SELECT a.*, u.first_name, u.last_name, m.module_name
+      SELECT
+        a.*,
+        u.first_name,
+        u.last_name,
+        m.module_code,
+        m.module_name
       FROM ANNOUNCEMENT a
       LEFT JOIN USER u ON a.created_by_user_id = u.user_id
       LEFT JOIN MODULE m ON a.module_id = m.module_id
     `;
     const params = [];
 
-    if (moduleId) {
+    if (moduleId === null) {
+      query += ` WHERE a.module_id IS NULL`;
+    } else if (moduleId !== undefined && moduleId !== '') {
       query += ` WHERE a.module_id = ?`;
       params.push(moduleId);
     }
@@ -51,22 +55,60 @@ const Announcement = {
     return rows;
   },
 
-  /**
-   * Update an announcement
-   */
-  async update(announcementId, { title, content }) {
+  async getForStudent(moduleIds = []) {
+    const ids = (moduleIds || []).map(Number).filter(Boolean);
+
+    if (ids.length === 0) {
+      const [rows] = await db.execute(
+        `SELECT
+           a.*,
+           u.first_name,
+           u.last_name,
+           m.module_code,
+           m.module_name
+         FROM ANNOUNCEMENT a
+         LEFT JOIN USER u ON a.created_by_user_id = u.user_id
+         LEFT JOIN MODULE m ON a.module_id = m.module_id
+         WHERE a.module_id IS NULL
+         ORDER BY a.created_at DESC`
+      );
+      return rows;
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const [rows] = await db.execute(
+      `SELECT
+         a.*,
+         u.first_name,
+         u.last_name,
+         m.module_code,
+         m.module_name
+       FROM ANNOUNCEMENT a
+       LEFT JOIN USER u ON a.created_by_user_id = u.user_id
+       LEFT JOIN MODULE m ON a.module_id = m.module_id
+       WHERE a.module_id IS NULL
+          OR a.module_id IN (${placeholders})
+       ORDER BY a.created_at DESC`,
+      ids
+    );
+    return rows;
+  },
+
+  async update(announcementId, { title, content, moduleId }) {
     const [result] = await db.execute(
       `UPDATE ANNOUNCEMENT
-       SET title = ?, content = ?
+       SET title = ?, content = ?, module_id = ?
        WHERE announcement_id = ?`,
-      [title, content, announcementId]
+      [
+        title,
+        content,
+        moduleId === undefined ? null : moduleId || null,
+        announcementId,
+      ]
     );
     return result.affectedRows > 0;
   },
 
-  /**
-   * Delete an announcement
-   */
   async delete(announcementId) {
     const [result] = await db.execute(
       `DELETE FROM ANNOUNCEMENT WHERE announcement_id = ?`,
