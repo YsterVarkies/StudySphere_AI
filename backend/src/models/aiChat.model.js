@@ -5,7 +5,7 @@ const AiChat = {
     const [result] = await db.execute(
       `INSERT INTO CHAT_SESSION (user_id, module_id, document_id, title, started_at)
        VALUES (?, ?, ?, ?, NOW())`,
-      [userId, moduleId, documentId || null, title || 'New Chat']
+      [userId, moduleId || null, documentId || null, title || 'New Chat']
     );
     return result.insertId;
   },
@@ -73,11 +73,40 @@ const AiChat = {
   },
 
   async deleteSession(sessionId, userId) {
-    const [result] = await db.execute(
-      `DELETE FROM CHAT_SESSION WHERE chat_session_id = ? AND user_id = ?`,
-      [sessionId, userId]
-    );
-    return result.affectedRows > 0;
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [owned] = await connection.execute(
+        `SELECT chat_session_id FROM CHAT_SESSION
+         WHERE chat_session_id = ? AND user_id = ?`,
+        [sessionId, userId]
+      );
+
+      if (owned.length === 0) {
+        await connection.rollback();
+        return false;
+      }
+
+      await connection.execute(
+        `DELETE FROM CHAT_MESSAGE WHERE chat_session_id = ?`,
+        [sessionId]
+      );
+
+      const [result] = await connection.execute(
+        `DELETE FROM CHAT_SESSION
+         WHERE chat_session_id = ? AND user_id = ?`,
+        [sessionId, userId]
+      );
+
+      await connection.commit();
+      return result.affectedRows > 0;
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   },
 };
 
