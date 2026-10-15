@@ -133,6 +133,36 @@ const createDocument = async (req, res) => {
             }
         }
 
+        // Enforce study material limits for students only
+        if (req.user.role === "student") {
+            // Check the overall document limit first
+            const totalDocuments =
+                await Document.countDocumentsByUser(userId);
+
+        if (totalDocuments >= 20) {
+        return res.status(409).json({
+            success: false,
+            code: "DOCUMENT_LIMIT_REACHED",
+            message:
+            "You can save a maximum of 20 study materials in total."
+        });
+        }
+        // Check the per-module document limit
+        const moduleDocuments =
+        await Document.countDocumentsByUserAndModule(
+        userId,
+        parsedModuleId
+        );
+        if (moduleDocuments >= 5) {
+        return res.status(409).json({
+            success: false,
+            code: "MODULE_DOCUMENT_LIMIT_REACHED",
+            message:
+            "You can save a maximum of 5 study materials per module."
+            });
+        }
+        }
+
 
         const file = req.file;
 
