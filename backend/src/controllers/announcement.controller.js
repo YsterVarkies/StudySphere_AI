@@ -1,14 +1,14 @@
 const Announcement = require('../models/announcement.model');
+const db = require('../../config/db');
 
-/**
- * POST /api/announcements
- * Create a new announcement
- */
+function getUserId(req) {
+  return req.user?.user_id || req.user?.id || null;
+}
+
+
 exports.createAnnouncement = async (req, res) => {
   try {
-    // The user ID comes from the authenticated JWT.
-    const createdByUserId = req.user?.user_id;
-
+    const createdByUserId = getUserId(req);
     const { moduleId, title, content, category } = req.body;
 
     const allowedCategories = [
@@ -44,13 +44,13 @@ exports.createAnnouncement = async (req, res) => {
       });
     }
 
-    // General and Campus announcements apply to all students.
     const isCampusWide = ['General', 'Campus'].includes(category);
 
     if (!isCampusWide && !moduleId) {
       return res.status(400).json({
         success: false,
-        message: 'Select a module for Academic or Deadline announcements',
+        message:
+          'Select a module for Academic or Deadline announcements',
       });
     }
 
@@ -74,12 +74,12 @@ exports.createAnnouncement = async (req, res) => {
       category,
     });
 
-    const announcement = await Announcement.getById(announcementId);
+    const row = await Announcement.getById(announcementId);
 
     return res.status(201).json({
       success: true,
       message: 'Announcement created successfully',
-      data: announcement,
+      data: row,
     });
   } catch (error) {
     console.error('createAnnouncement error:', error);
@@ -98,29 +98,53 @@ exports.createAnnouncement = async (req, res) => {
 
 exports.getAnnouncements = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const role = req.user?.role?.toLowerCase();
-    const userId = req.user?.user_id;
+    const { moduleId, scope } = req.query;
 
-    let announcements;
+    const isAdmin =
+      role === 'admin' ||
+      role === 'administrator' ||
+      scope === 'admin';
 
-    if (role === 'admin' || role === 'administrator') {
-      const { moduleId } = req.query;
-      announcements = await Announcement.getAll(moduleId || null);
-    } else {
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: 'Authenticated user ID not found',
-        });
+    if (isAdmin) {
+      let filter;
+
+      if (moduleId === 'null' || moduleId === '') {
+        filter = null;
+      } else if (moduleId !== undefined) {
+        filter = Number(moduleId);
+
+        if (!Number.isInteger(filter) || filter <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Please select a valid module',
+          });
+        }
+      } else {
+        filter = undefined;
       }
 
-      announcements =
-        await Announcement.getVisibleToStudent(userId);
+      const rows = await Announcement.getAll(filter);
+
+      return res.json({
+        success: true,
+        data: rows,
+      });
     }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authenticated user ID not found',
+      });
+    }
+
+    const rows = await Announcement.getVisibleToStudent(userId);
 
     return res.json({
       success: true,
-      data: announcements,
+      data: rows,
     });
   } catch (error) {
     console.error('getAnnouncements error:', error);
@@ -138,21 +162,11 @@ exports.getAnnouncements = async (req, res) => {
  */
 exports.getAnnouncementById = async (req, res) => {
   try {
-    const announcementId = parseInt(req.params.id, 10);
-
-    const announcement = await Announcement.getById(announcementId);
-
-    if (!announcement) {
-      return res.status(404).json({
-        success: false,
-        message: 'Announcement not found',
-      });
+    const row = await Announcement.getById(parseInt(req.params.id, 10));
+    if (!row) {
+      return res.status(404).json({ success: false, message: 'Not found' });
     }
-
-    return res.json({
-      success: true,
-      data: announcement,
-    });
+    return res.json({ success: true, data: row });
   } catch (error) {
     console.error('getAnnouncementById error:', error);
     return res.status(500).json({
@@ -162,13 +176,10 @@ exports.getAnnouncementById = async (req, res) => {
   }
 };
 
-/**
- * PUT /api/announcements/:id
- */
 exports.updateAnnouncement = async (req, res) => {
   try {
     const announcementId = parseInt(req.params.id, 10);
-    const { title, content } = req.body;
+    const { title, content, moduleId } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({
@@ -177,22 +188,18 @@ exports.updateAnnouncement = async (req, res) => {
       });
     }
 
-    const updated = await Announcement.update(announcementId, { title, content });
+    const updated = await Announcement.update(announcementId, {
+      title: String(title).trim(),
+      content: String(content).trim(),
+      moduleId: moduleId != null && moduleId !== '' ? Number(moduleId) : null,
+    });
 
     if (!updated) {
-      return res.status(404).json({
-        success: false,
-        message: 'Announcement not found',
-      });
+      return res.status(404).json({ success: false, message: 'Not found' });
     }
 
-    const announcement = await Announcement.getById(announcementId);
-
-    return res.json({
-      success: true,
-      message: 'Announcement updated successfully',
-      data: announcement,
-    });
+    const row = await Announcement.getById(announcementId);
+    return res.json({ success: true, message: 'Updated', data: row });
   } catch (error) {
     console.error('updateAnnouncement error:', error);
     return res.status(500).json({
@@ -202,26 +209,13 @@ exports.updateAnnouncement = async (req, res) => {
   }
 };
 
-/**
- * DELETE /api/announcements/:id
- */
 exports.deleteAnnouncement = async (req, res) => {
   try {
-    const announcementId = parseInt(req.params.id, 10);
-
-    const deleted = await Announcement.delete(announcementId);
-
+    const deleted = await Announcement.delete(parseInt(req.params.id, 10));
     if (!deleted) {
-      return res.status(404).json({
-        success: false,
-        message: 'Announcement not found',
-      });
+      return res.status(404).json({ success: false, message: 'Not found' });
     }
-
-    return res.json({
-      success: true,
-      message: 'Announcement deleted successfully',
-    });
+    return res.json({ success: true, message: 'Deleted' });
   } catch (error) {
     console.error('deleteAnnouncement error:', error);
     return res.status(500).json({

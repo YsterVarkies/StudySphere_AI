@@ -1,4 +1,3 @@
-
 const express = require('express');
 
 const router = express.Router();
@@ -10,11 +9,14 @@ const { authenticateToken, requireRole } = require('../../middleware/auth.middle
 router.use(authenticateToken);
 
 // Students and admins can VIEW announcements
+// Students: global (module_id NULL) + their modules
+// Admin full list: GET /api/announcements?scope=admin
 router.get('/', announcementController.getAnnouncements);
 
 router.get('/:id', announcementController.getAnnouncementById);
 
 // Only administrators can CREATE announcements
+// body: { title, content, moduleId? }  — omit moduleId = all students
 router.post(
     '/',
     requireRole('admin'),
