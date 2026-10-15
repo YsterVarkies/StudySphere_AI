@@ -1,16 +1,36 @@
+
 const db = require('../../config/db');
 
 const Announcement = {
-  async create({ moduleId, createdByUserId, title, content }) {
+  /**
+   * Create a new announcement
+   */
+  async create({
+    moduleId,
+    createdByUserId,
+    title,
+    content,
+    category,
+  }) {
     const [result] = await db.execute(
       `INSERT INTO ANNOUNCEMENT
-         (module_id, created_by_user_id, title, content, created_at)
-       VALUES (?, ?, ?, ?, NOW())`,
-      [moduleId || null, createdByUserId, title, content]
+        (module_id, created_by_user_id, title, content, category, created_at)
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [
+        moduleId ?? null,
+        createdByUserId,
+        title,
+        content,
+        category,
+      ]
     );
+
     return result.insertId;
   },
 
+  /**
+   * Get one announcement by ID
+   */
   async getById(announcementId) {
     const [rows] = await db.execute(
       `SELECT
@@ -20,14 +40,58 @@ const Announcement = {
          m.module_code,
          m.module_name
        FROM ANNOUNCEMENT a
-       LEFT JOIN USER u ON a.created_by_user_id = u.user_id
-       LEFT JOIN MODULE m ON a.module_id = m.module_id
+       LEFT JOIN USER u
+         ON a.created_by_user_id = u.user_id
+       LEFT JOIN MODULE m
+         ON a.module_id = m.module_id
        WHERE a.announcement_id = ?`,
       [announcementId]
     );
+
     return rows[0] || null;
   },
 
+  /**
+   * Get announcements visible to a student:
+   * campus-wide announcements and announcements
+   * for modules linked to the student's cohort.
+   */
+  async getVisibleToStudent(userId) {
+    const [rows] = await db.execute(
+      `SELECT
+         a.*,
+         u.first_name,
+         u.last_name,
+         m.module_code,
+         m.module_name
+       FROM ANNOUNCEMENT a
+       LEFT JOIN USER u
+         ON a.created_by_user_id = u.user_id
+       LEFT JOIN MODULE m
+         ON a.module_id = m.module_id
+       WHERE a.module_id IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM \`USER\` student
+            JOIN COHORT_MODULE cm
+              ON cm.cohort_id = student.cohort_id
+            WHERE student.user_id = ?
+              AND cm.module_id = a.module_id
+          )
+       ORDER BY a.created_at DESC
+       LIMIT 10`,
+      [userId]
+    );
+
+    return rows;
+  },
+
+  /**
+   * Get all announcements.
+   * undefined = no module filter
+   * null = campus-wide announcements only
+   * number = announcements for a specific module
+   */
   async getAll(moduleId = undefined) {
     let query = `
       SELECT
@@ -37,9 +101,12 @@ const Announcement = {
         m.module_code,
         m.module_name
       FROM ANNOUNCEMENT a
-      LEFT JOIN USER u ON a.created_by_user_id = u.user_id
-      LEFT JOIN MODULE m ON a.module_id = m.module_id
+      LEFT JOIN USER u
+        ON a.created_by_user_id = u.user_id
+      LEFT JOIN MODULE m
+        ON a.module_id = m.module_id
     `;
+
     const params = [];
 
     if (moduleId === null) {
@@ -55,65 +122,65 @@ const Announcement = {
     return rows;
   },
 
-  async getForStudent(moduleIds = []) {
-    const ids = (moduleIds || []).map(Number).filter(Boolean);
+  /**
+   * Update an announcement.
+   * Only supplied fields are updated.
+   */
+  async update(announcementId, {
+    title,
+    content,
+    category,
+    moduleId,
+  }) {
+    const fields = [];
+    const params = [];
 
-    if (ids.length === 0) {
-      const [rows] = await db.execute(
-        `SELECT
-           a.*,
-           u.first_name,
-           u.last_name,
-           m.module_code,
-           m.module_name
-         FROM ANNOUNCEMENT a
-         LEFT JOIN USER u ON a.created_by_user_id = u.user_id
-         LEFT JOIN MODULE m ON a.module_id = m.module_id
-         WHERE a.module_id IS NULL
-         ORDER BY a.created_at DESC`
-      );
-      return rows;
+    if (title !== undefined) {
+      fields.push('title = ?');
+      params.push(title);
     }
 
-    const placeholders = ids.map(() => '?').join(',');
-    const [rows] = await db.execute(
-      `SELECT
-         a.*,
-         u.first_name,
-         u.last_name,
-         m.module_code,
-         m.module_name
-       FROM ANNOUNCEMENT a
-       LEFT JOIN USER u ON a.created_by_user_id = u.user_id
-       LEFT JOIN MODULE m ON a.module_id = m.module_id
-       WHERE a.module_id IS NULL
-          OR a.module_id IN (${placeholders})
-       ORDER BY a.created_at DESC`,
-      ids
-    );
-    return rows;
-  },
+    if (content !== undefined) {
+      fields.push('content = ?');
+      params.push(content);
+    }
 
-  async update(announcementId, { title, content, moduleId }) {
+    if (category !== undefined) {
+      fields.push('category = ?');
+      params.push(category);
+    }
+
+    if (moduleId !== undefined) {
+      fields.push('module_id = ?');
+      params.push(moduleId);
+    }
+
+    if (fields.length === 0) {
+      return false;
+    }
+
+    params.push(announcementId);
+
     const [result] = await db.execute(
       `UPDATE ANNOUNCEMENT
-       SET title = ?, content = ?, module_id = ?
+       SET ${fields.join(', ')}
        WHERE announcement_id = ?`,
-      [
-        title,
-        content,
-        moduleId === undefined ? null : moduleId || null,
-        announcementId,
-      ]
+      params
     );
+
     return result.affectedRows > 0;
   },
 
+  /**
+   * Delete an announcement
+   */
   async delete(announcementId) {
     const [result] = await db.execute(
-      `DELETE FROM ANNOUNCEMENT WHERE announcement_id = ?`,
+      `DELETE FROM ANNOUNCEMENT
+       WHERE announcement_id = ?`,
       [announcementId]
     );
+
     return result.affectedRows > 0;
   },
 };
