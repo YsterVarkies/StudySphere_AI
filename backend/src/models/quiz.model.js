@@ -39,9 +39,7 @@ const Quiz = {
             question.correctOption ||
             '';
 
-          const explanation =
-            question.explanation ||
-            null;
+          const explanation = question.explanation || null;
 
           if (!questionText.trim()) {
             throw new Error(`Question ${i + 1} has no question text`);
@@ -68,7 +66,7 @@ const Quiz = {
               questionText,
               JSON.stringify(options),
               correctAnswer,
-              explanation
+              explanation,
             ]
           );
         }
@@ -140,13 +138,13 @@ const Quiz = {
         options: options,
         correct_answer: question.correct_answer,
         correctAnswer: question.correct_answer,
-        explanation: question.explanation
+        explanation: question.explanation,
       };
     });
 
     return {
       ...quizzes[0],
-      questions: parsedQuestions
+      questions: parsedQuestions,
     };
   },
 
@@ -193,15 +191,32 @@ const Quiz = {
     try {
       await connection.beginTransaction();
 
+      const [owned] = await connection.execute(
+        `SELECT quiz_id FROM QUIZ WHERE quiz_id = ? AND user_id = ?`,
+        [quizId, userId]
+      );
+
+      if (owned.length === 0) {
+        await connection.rollback();
+        return false;
+      }
+
+      await connection.execute(
+        `DELETE FROM QUIZ_ATTEMPT WHERE quiz_id = ?`,
+        [quizId]
+      );
+
+      await connection.execute(
+        `DELETE FROM QUIZ_QUESTION WHERE quiz_id = ?`,
+        [quizId]
+      );
+
       const [quizResult] = await connection.execute(
-        `DELETE FROM QUIZ
-         WHERE quiz_id = ?
-           AND user_id = ?`,
+        `DELETE FROM QUIZ WHERE quiz_id = ? AND user_id = ?`,
         [quizId, userId]
       );
 
       await connection.commit();
-
       return quizResult.affectedRows > 0;
     } catch (error) {
       await connection.rollback();
@@ -223,12 +238,7 @@ const Quiz = {
          completed_at
        )
        VALUES (?, ?, ?, ?, NOW(), NOW())`,
-      [
-        quizId,
-        userId,
-        JSON.stringify(answers || {}),
-        score
-      ]
+      [quizId, userId, JSON.stringify(answers || {}), score]
     );
 
     return result.insertId;
@@ -264,10 +274,10 @@ const Quiz = {
 
       return {
         ...row,
-        answers
+        answers,
       };
     });
-  }
+  },
 };
 
 module.exports = Quiz;

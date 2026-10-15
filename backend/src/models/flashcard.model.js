@@ -86,11 +86,40 @@ const Flashcard = {
   },
 
   async deleteSet(flashcardSetId, userId) {
-    const [result] = await db.execute(
-      `DELETE FROM FLASHCARD_SET WHERE flashcard_set_id = ? AND user_id = ?`,
-      [flashcardSetId, userId]
-    );
-    return result.affectedRows > 0;
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [owned] = await connection.execute(
+        `SELECT flashcard_set_id FROM FLASHCARD_SET
+         WHERE flashcard_set_id = ? AND user_id = ?`,
+        [flashcardSetId, userId]
+      );
+
+      if (owned.length === 0) {
+        await connection.rollback();
+        return false;
+      }
+
+      await connection.execute(
+        `DELETE FROM FLASHCARD WHERE flashcard_set_id = ?`,
+        [flashcardSetId]
+      );
+
+      const [result] = await connection.execute(
+        `DELETE FROM FLASHCARD_SET
+         WHERE flashcard_set_id = ? AND user_id = ?`,
+        [flashcardSetId, userId]
+      );
+
+      await connection.commit();
+      return result.affectedRows > 0;
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   },
 };
 
