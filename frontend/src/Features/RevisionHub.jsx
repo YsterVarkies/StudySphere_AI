@@ -67,6 +67,7 @@ function RevisionHub() {
     const [savedFlashcards, setSavedFlashcards] = useState([]); //stores flashcards saved by the user
     const [historyLoading, setHistoryLoading] = useState(false); //used while loading saved quizzes/flashcards
     const [historyError, setHistoryError] = useState(""); //stores an error message when loading saved quizzes/flashcards
+    const [message, setMessage] = useState(""); // show message 
     const [openingRevision, setOpeningRevision] = useState(""); //stores the ID of the revision content the user is opening from history
     const [historySearch, setHistorySearch] = useState(""); //stores the search term for filtering saved quizzes/flashcards
     const [historyFilter, setHistoryFilter] = useState("all"); //stores the filter for saved quizzes/flashcards (all, quizzes, flashcards)
@@ -120,6 +121,7 @@ function RevisionHub() {
 
     /* Load Previously Saved Revision Content */
     async function loadPreviousRevision() {
+        setMessage(""); //Clear the success message when revision history refreshes
         setHistoryLoading(true);
         setHistoryError("");
 
@@ -201,6 +203,9 @@ function RevisionHub() {
 
             await loadPreviousRevision(); //Refreshes the saved revisions list
             setDeleteRevision(null); //close confirmation popup
+            setMessage(
+                type === "quiz" ? "Quiz deleted successfully." : "Flashcard set deleted successfully."
+            );
         } catch (error) {
             console.error("Delete revision error: ", error);
             setHistoryError(error.message || "Unable to delete revision.");
@@ -774,6 +779,11 @@ function RevisionHub() {
                         <option value="flashcards">Flashcards</option>
                     </select>
                 </div>
+                {message && (
+                    <p className="revision-hub-page__success">
+                        {message}
+                    </p>
+                )}
 
                 {historyError && (
                     <p className="revision-hub-page__error">
@@ -903,14 +913,14 @@ function RevisionHub() {
                 )}
             </section>
 
-               {/*  Delete Revision Confirmation Popup  */}
-               {deleteRevision && (
+            {/*  Delete Revision Confirmation Popup  */}
+            {deleteRevision && (
                 <div className="revision-hub-page__modal-backdrop">
-                    <div 
-                    className="revision-hub-page__delete-modal"
-                    role="alertdialog" //identifies the popup as an important confirmation dialog
-                    aria-modal="true" // tells assistive tech that the dialog is modal
-                    aria-labelledby="delete-revision-title" //connects the dialog to its heading
+                    <div
+                        className="revision-hub-page__delete-modal"
+                        role="alertdialog" //identifies the popup as an important confirmation dialog
+                        aria-modal="true" // tells assistive tech that the dialog is modal
+                        aria-labelledby="delete-revision-title" //connects the dialog to its heading
                     >
                         <h2 id="delete-revision-title">
                             Delete {deleteRevision.type === "quiz" ? "Quiz" : "Flashcard"}? {/* changes heading based on what is selected */}
@@ -924,25 +934,25 @@ function RevisionHub() {
                         </p>
                         <div className="revision-hub-page__modal-actions">
                             <button
-                            type="button"
-                            className="revision-hub-page__btn-cancel"
-                            onClick={() => setDeleteRevision(null)}
-                            disabled={deletingRevision} //prevent repeated button clicks
+                                type="button"
+                                className="revision-hub-page__btn-cancel"
+                                onClick={() => setDeleteRevision(null)}
+                                disabled={deletingRevision} //prevent repeated button clicks
                             >
                                 Cancel
                             </button>
                             <button
-                            type="button"
-                            className="revision-hub-page__btn-delete-confirm"
-                            onClick={handleDeleteRevision}
-                            disabled={deletingRevision}
+                                type="button"
+                                className="revision-hub-page__btn-delete-confirm"
+                                onClick={handleDeleteRevision}
+                                disabled={deletingRevision}
                             >
                                 {deletingRevision ? "Deleting..." : "Yes, Delete"} {/* change the text on the button */}
                             </button>
                         </div>
                     </div>
                 </div>
-               )}
+            )}
 
             {/* ERROR MESSAGE */}
             {error && (
