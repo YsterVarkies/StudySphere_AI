@@ -50,6 +50,33 @@ const getDocumentById = async (documentId, userId) => {
     return rows[0];
 };
 
+
+ // Count all documents belonging to a student
+const countDocumentsByUser = async (userId) => {
+    const [rows] = await db.query(
+        `SELECT COUNT(*) AS total
+         FROM \`DOCUMENT\`
+         WHERE user_id = ?`,
+        [userId]
+    );
+
+    return Number(rows[0].total);
+};
+
+// Count documents belonging to a student in one module
+const countDocumentsByUserAndModule = async (userId, moduleId) => {
+    const [rows] = await db.query(
+        `SELECT COUNT(*) AS total
+         FROM \`DOCUMENT\`
+         WHERE user_id = ?
+           AND module_id = ?`,
+        [userId, moduleId]
+    );
+
+    return Number(rows[0].total);
+};
+
+
 // Create a document
 const createDocument = async (
     userId,
@@ -104,5 +131,7 @@ module.exports = {
     getDocumentsByUser,
     getDocumentById,
     createDocument,
-     deleteDocument
+    deleteDocument,
+    countDocumentsByUser,
+    countDocumentsByUserAndModule
 };
