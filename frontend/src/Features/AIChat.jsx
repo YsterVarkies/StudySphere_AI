@@ -60,7 +60,11 @@ function AIChat({ initialDocument }) {
     const [chatSearch, setChatSearch] = useState("");
     const [historyLoading, setHistoryLoading] = useState(false);
     const [historyError, setHistoryError] = useState("");
+    const [message, setMessage] = useState(""); //display message
     const [openingChat, setOpeningChat] = useState(false);
+    const [deleteChat, setDeleteChat] = useState(null); //stores the selected chat
+    const [deletingChat, setDeletingChat] = useState(false); //Tracks deletion 
+
 
     const skipDocumentResetRef = useRef(false);
 
@@ -135,6 +139,7 @@ function AIChat({ initialDocument }) {
 
     /* LOAD PREVIOUS CHAT SESSIONs */
     async function loadPreviousChats() {
+        setMessage(""); //clear success message when chats refresh
         setHistoryLoading(true);
         setHistoryError("");
 
@@ -211,6 +216,59 @@ function AIChat({ initialDocument }) {
         }
     }
 
+    /* Delete a saved chat converstation */
+    async function handleDeleteChat() { //Function for deleting a chat
+        if (!deleteChat || deletingChat) return; //prevent deleting without a selected chat
+
+        const chatId = deleteChat.chat_session_id; //gets saved chat's database ID
+
+        if (!chatId) {
+            setHistoryError("Could not identify the chat to delete.");
+            setDeleteChat(null);
+            setMessage(""); //clear an old success message 
+            return;
+        }
+
+        setDeletingChat(true); //marks the deletion as in progress
+        setHistoryError("");
+
+        try {
+            const token = getToken(); //gets student's logged-in authentication token
+
+            if (!token) {
+                throw new Error("Please log in again to delete a chat.");
+            }
+            const response = await fetch(
+                `${API_URL}/chat/sessions/${chatId}`,
+                {
+                    method: "DELETE", // asks backend to delete the chat session
+                    headers: {
+                        Authorization: `Bearer ${token}`, // authenticates the request
+                    },
+                }
+            );
+            if (!response.ok) { //detects when backend rejects the deletion.
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || `Unable to delete chat (Status: ${response.status})`);
+            }
+
+            //clear the chat if it is currently open
+            if (String(sessionId) === String(chatId)) { //checks if the chat being deleted is the current one displayed
+                setSessionId(null); //clears chat active session ID
+                setMessages([]); // removes the deletion message
+                setQuestion(""); //clears any unfinished questions
+            }
+            await loadPreviousChats(); //reloads the saved chat after successful deletion
+            setDeleteChat(null); //closes the confirmation popup on success/ failure
+            setMessage("Chat deleted successfully."); //show success message
+        } catch (error) {
+            console.error("Delete chat error: ", error);
+            setHistoryError(error.message || "Unable to delete chat.");
+            setDeleteChat(null);
+        } finally { // resets the deletion loading state
+            setDeletingChat(false);
+        }
+    }
 
     /* OPEN A SAVED CONVERSATION */
     async function openPreviousChat(chat) {
@@ -581,6 +639,12 @@ function AIChat({ initialDocument }) {
                             {historyLoading ? "Refreshing..." : "Refresh Chats"}
                         </button>
 
+                        {message && (
+                            <p className="ai-chat-page__success">
+                                {message}
+                            </p>
+                        )}
+
                         {historyError && (
                             <p className="ai-chat-page__history-error">
                                 {historyError}
@@ -594,28 +658,93 @@ function AIChat({ initialDocument }) {
                                 <p>No previous conversations found.</p>
                             ) : (
                                 filteredChats.map((chat) => (
-                                    <button
-                                        key={chat.chat_session_id}
-                                        type="button"
-                                        className="ai-chat-page__history-item"
-                                        onClick={() => openPreviousChat(chat)}
-                                        disabled={
-                                            openingChat ||
-                                            loading ||
-                                            initialisingSession
-                                        }
+                                    <div
+                                        key={chat.chat_session_id} // gives each chat a unique identity in react
+                                        className="ai-chat-page__history-row" //create a container for two buttons
                                     >
-                                        <strong>{chat.title || "Untitled Chat"}</strong>
-                                        {chat.document_title && (
-                                            <span>{chat.document_title}</span>
-                                        )}
-                                    </button>
+                                        <button
+                                            type="button"
+                                            className="ai-chat-page__history-item" //preseves the existing button for opening saved chats
+                                            onClick={() => openPreviousChat(chat)} //reopen and continue chat
+                                            disabled={openingChat || loading || initialisingSession || deletingChat}
+                                        >
+                                            <strong>{chat.title || "Untitled Chat"}</strong>
+                                            {chat.document_title && (
+                                                <span>{chat.document_title}</span>
+                                            )}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="ai-chat-page__delete-btn"
+                                            onClick={() => setDeleteChat(chat)} //remembers selected chat
+                                            disabled={loading || initialisingSession || openingChat || deletingChat} //prevents conflicting actions
+                                            aria-label={`Delete ${chat.title || "Untitled Chat"}`} // makes icon only button
+                                            title="Delete Chat"
+                                        >
+                                            <svg //Scalable Vector Graphics - starts SVG drawing
+                                                width="18" // makes icon 18 pixels wide
+                                                height="18" // makes icon 18 pixels tall
+                                                viewBox="0 0 24 24" //creates drawing coordinate system measuring 24 units wide and 24 units high, starting at position (0,0)
+                                                fill="none" //prevents shapes from being filled with a solid color - only outlines
+                                                stroke="currentColor" // makes the icon's lines use the CSS color of the element
+                                                strokeWidth="1.8" //controls how thick the lines are
+                                                strokeLinecap="round" // rounds the ends of the lines 
+                                                strokeLinejoin="round" // rounds the corners
+                                                aria-hidden="true" // hides the decorative SVG from screen readers because the surrounding button already has an aria-label
+                                            >
+                                                {/* the <path> lines draws the trash can */}
+                                                <path d="M3 6h18" /> {/* top rim - M3 6 means move to coordinates (3,6). h18 means draw a horizontal line 18 units to the right */}
+                                                <path d="M8 6V4h8v2" /> {/* handle on the lid - Start at (8,6), draw upwards to y=4, draw right 8units, then down 2 units */}
+                                                <path d="M5 6l1 15h12l1-15" /> {/* body of trash can - start at (5,6), draw diagonally down and right, across the bottom, then diagonally up and right. This creates the container outline */}
+                                                <path d="M10 10v7" /> {/* two verical lines inside - draw two vertical lines down 7 units, one starting at (10,10) and the othe at (14,10) */}
+                                                <path d="M14 10v7" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 ))
                             )}
                         </div>
                     </aside>
                 )}
 
+                {/* Delete Chat Confirmation Popup */}
+                {deleteChat && (
+                    <div className="ai-chat-page__modal-backdrop" >
+                        <div
+                            className="ai-chat-page__delete-modal"
+                            role="alertdialog"
+                            aria-modal="true"
+                            aria-labelledby="delete-chat-title"
+                        >
+                            <h2 id="delete-chat-title">Delete Chat?</h2>
+
+                            <p>Are you sure you want to delete{" "}
+                                <strong>{deleteChat.title || "Untitled Chat"}</strong>?
+                            </p>
+                            <p className="ai-chat-page__delete-warning">
+                                ⚠️ This action cannot be undone.
+                            </p>
+                            <div className="ai-chat-page__modal-actions">
+                                <button
+                                    type="button"
+                                    className="ai-chat-page__btn-cancel"
+                                    onClick={() => setDeleteChat(null)}
+                                    disabled={deletingChat}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ai-chat-page__btn-delete-confirm"
+                                    onClick={handleDeleteChat}
+                                    disabled={deletingChat}
+                                >
+                                    {deletingChat ? "Deleting..." : "Yes, Delete"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <section className="ai-chat-page__chat">
 

@@ -601,6 +601,43 @@
     font: inherit;
     cursor: pointer;
 }
+/* container for each saved chat and its delete button */
+.ai-chat-page__history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* allow the chat button to fill the remaining space */
+.ai-chat-page__history-row 
+.ai-chat-page__history-item {
+  flex: 1;
+  min-width: 0;
+}
+/* Red trash button */
+.ai-chat-page__delete-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff5f5;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.ai-chat-page__delete-btn:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #dc2626;
+}
+
+.ai-chat-page__delete-btn:disabled{
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .ai-chat-page__history-item:hover {
     background: #fff7ed;
@@ -654,6 +691,17 @@
     cursor: not-allowed;
 }
 
+/* success message after deleting a chat */
+.ai-chat-page__success {
+  padding: 12px 16px;
+  margin: 0;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .ai-chat-page__history-error {
     padding: 10px;
     background: #fee2e2;
@@ -682,4 +730,99 @@
     .ai-chat-page__toolbar {
         flex-wrap: wrap;
     }
+}
+
+/* Delete chat confirmation Popup */
+.ai-chat-page__modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 32, 61, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+/* Popup box */
+.ai-chat-page__delete-modal {
+  width: 100%;
+  max-width: 430px;
+  padding: 28px;
+  box-sizing: border-box;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(10, 32, 61, 0.3);
+  border-top: 5px solid #dc2626;
+  font-family: inherit;
+  font-size: 16px;
+}
+/* Popup heading */
+.ai-chat-page__delete-modal h2 {
+  margin: 0 0 18px;
+  color: #0a203d;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+/* Poup description */
+.ai-chat-page__delete-modal p {
+  margin: 0 0 14px;
+  color: #334155;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* Warning text */
+.ai-chat-page__delete-modal
+.ai-chat-page__delete-warning {
+  padding: 14px 16px;
+  background: #fff1f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* Cancel and Delete buttons */
+.ai-chat-page__modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+/* Cancel button */
+.ai-chat-page__btn-cancel {
+  padding: 10px 16px;
+  background: #ffffff;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+/* Confirm delete button */
+.ai-chat-page__btn-delete-confirm {
+  padding: 10px 16px;
+  background: #dc2626;
+  color: #ffffff;
+  border: 1px solid #dc2626;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.ai-chat-page__btn-delete-confirm:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.ai-chat-page__btn-cancel:disabled,
+.ai-chat-page__btn-delete-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
