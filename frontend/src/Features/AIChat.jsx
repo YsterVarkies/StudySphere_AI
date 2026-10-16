@@ -661,7 +661,9 @@ function AIChat({ initialDocument }) {
                                     >
                                         <button
                                             type="button"
-                                            className="ai-chat-page__history-item" //preseves the existing button for opening saved chats
+                                            className={`ai-chat-page__history-item ${String(sessionId) === String(chat.chat_session_id)
+                                                ? "ai-chat-page__history-item--active" : ""
+                                            }`}//preseves the existing button for opening saved chats
                                             onClick={() => openPreviousChat(chat)} //reopen and continue chat
                                             disabled={openingChat || loading || initialisingSession || deletingChat}
                                         >

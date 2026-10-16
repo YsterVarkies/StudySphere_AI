@@ -650,6 +650,13 @@
     border-color: #e07a19;
 }
 
+/* show which chat is open  */
+.ai-chat-page__history-item--active,
+.ai-chat-page__history-item--active:hover {
+  background: #fff7ed;
+  border: 2px solid #fdba74;
+}
+
 .ai-chat-page__history-item strong {
     color: #0a203d;
     font-size: 13px;
