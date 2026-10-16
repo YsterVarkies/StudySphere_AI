@@ -564,14 +564,20 @@
 
 .ai-chat-page__history-refresh {
     padding: 9px 12px;
-    background: #ffffff;
-    color: #0a203d;
-    border: 1px solid #cbd5e1;
+    background: #0a203d;
+    color: #ffffff;
+    border: 1px solid #0a203d;
     border-radius: 8px;
     font: inherit;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
+}
+
+.ai-chat-page__history-refresh:hover:not(:disabled) {
+  background: #17365c;
+  border-color: #17365c;
+  color: #ffffff;
 }
 
 .ai-chat-page__history-list {
@@ -647,13 +653,25 @@
 .ai-chat-page__history-item strong {
     color: #0a203d;
     font-size: 13px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
     overflow-wrap: anywhere;
+    max-width: 100%;
 }
 
 .ai-chat-page__history-item span {
     color: #64748b;
     font-size: 12px;
-    overflow-wrap: anywhere;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 /* CHAT TOOLBAR */
@@ -724,11 +742,18 @@
     }
 
     .ai-chat-page__history {
-        max-height: 300px;
+        max-height: 500px;
     }
 
     .ai-chat-page__toolbar {
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .ai-chat-page__toolbar button {
+      width: 100%;
+      min-width: 0;
     }
 }
 
@@ -825,4 +850,36 @@
 .ai-chat-page__btn-delete-confirm:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* storage counter saved chats */
+.ai-chat-page__storage-count {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #0a203d;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ai-chat-page__storage-count div:first-child {
+  font-weight: 600;
+}
+
+.ai-chat-page__storage-count div:last-child {
+  color: #64748b;
+}
+
+/* Warning for full storage */
+.ai-chat-page__storage-warning {
+  margin: 10px 0;
+  padding: 10px 12px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  color: #be123c;
+  font-size: 13px;
+  line-height: 1.5;
 }

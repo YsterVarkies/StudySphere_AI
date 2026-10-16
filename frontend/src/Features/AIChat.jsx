@@ -5,6 +5,7 @@ import "./AIChat.css"; // import the CSS file for styling the AIChat component
 
 /* GLOBAL CONFIGURATION */
 const API_URL = "http://localhost:5000/api"; // the base URL for the backend API
+const MAX_CHATS = 20; //Max saved chats per student
 
 /* SESSION HELPERS */
 function getSession() {
@@ -165,48 +166,7 @@ function AIChat({ initialDocument }) {
             if (!Array.isArray(data.data)) {
                 throw new Error("Unexpected chat history response.");
             }
-
-
-            // Keep only conversations containing a saved AI reply.
-            const checkedChats = await Promise.all(
-                data.data.map(async (chat) => {
-                    try {
-                        const messagesResponse = await fetch(
-                            `${API_URL}/chat/sessions/${chat.chat_session_id}/messages`,
-                            {
-                                headers: {
-                                    Authorization: `Bearer ${token}`,
-                                },
-                            }
-                        );
-
-                        if (!messagesResponse.ok) {
-                            return null;
-                        }
-
-                        const messagesData = await messagesResponse.json();
-
-                        const hasAIResponse =
-                            Array.isArray(messagesData.data) &&
-                            messagesData.data.some(
-                                (message) =>
-                                    message.sender === "ai" &&
-                                    String(message.message_text || "").trim() !== ""
-                            );
-
-                        return hasAIResponse ? chat : null;
-                    } catch (error) {
-                        console.error(
-                            "Could not check chat:",
-                            chat.chat_session_id,
-                            error
-                        );
-                        return null;
-                    }
-                })
-            );
-
-            setPreviousChats(checkedChats.filter(Boolean));
+            setPreviousChats(data.data);
 
         } catch (error) {
             console.error("Load previous chats error:", error);
@@ -345,6 +305,15 @@ function AIChat({ initialDocument }) {
     function startNewChat() {
         if (loading || initialisingSession || openingChat) return;
 
+        //Show the storage warning if storage is full
+        if (totalChats >= MAX_CHATS) {
+            setError(
+                `You've reached your limit of ${MAX_CHATS} saved chats. You can continue existing conversations, but you will need to delete a chat before starting a new one. `
+            );
+            setHistoryOpen(true);
+            return;
+        }
+
         setSessionId(null);
         setMessages([]);
         setQuestion("");
@@ -375,6 +344,12 @@ function AIChat({ initialDocument }) {
      * Create a new chat session and return the session id. 
      */
     async function initialiseSession() {
+
+        //prevent student creating a new chat session when storage is full
+        if (totalChats >= MAX_CHATS) {
+            setError(`You've reached your limit of ${MAX_CHATS} saved chats. You can continue existing conversations, but you will need to delete a chat before starting a new one.`);
+            return null;
+        }
 
         if (sessionInitialisingRef.current) {
             return null;
@@ -438,6 +413,9 @@ function AIChat({ initialDocument }) {
             }
             setSessionId(newSessionId);
 
+            //refresh chats so the storage counter updates
+            await loadPreviousChats();
+
             return newSessionId;
         } catch (error) {
             console.error("Session initialisation error: ", error);
@@ -497,7 +475,10 @@ function AIChat({ initialDocument }) {
             }
 
             if (!activeSessionId) {
-                throw new Error("Could not create a chat session.");
+                throw new Error(totalChats >= MAX_CHATS 
+                    ? `You've reached your limit of ${MAX_CHATS} saved chats. You can continue existing conversations, but you will need to delete a chat before starting a new one.`
+                    : "Could not create a chat session."
+                );
             }
 
             /* SEND THE QUESTION TO THE BACKEND */
@@ -562,6 +543,10 @@ function AIChat({ initialDocument }) {
         }
     }
 
+    /* Storage count */
+    const totalChats = previousChats.length; //count chats returned by backend
+    const chatsRemaining = Math.max(MAX_CHATS - totalChats, 0); //calculates how many slots remain
+ 
     /*FILTERS PREVIOUS CHATS */
     const filteredChats = previousChats.filter((chat) => {
         const search = chatSearch.trim().toLowerCase();
@@ -622,6 +607,18 @@ function AIChat({ initialDocument }) {
                             </button>
                         </div>
 
+                        <div className="ai-chat-page__storage-count">
+                            <div>Saved Chats: {totalChats} / {MAX_CHATS}</div>
+                            <div>{chatsRemaining}{chatsRemaining === 1 ? " slot" : " slots"} remaining</div>
+                        </div>
+
+                        {totalChats >= MAX_CHATS && (
+                            <p className="ai-chat-page__storage-warning">
+                                You've reached your limit of {MAX_CHATS} saved chats.
+                                You can continue existing conversations, but you will need to delete a chat before starting a new one.
+                            </p>
+                        )}
+
                         <input
                             type="search"
                             className="ai-chat-page__history-search"
@@ -668,9 +665,13 @@ function AIChat({ initialDocument }) {
                                             onClick={() => openPreviousChat(chat)} //reopen and continue chat
                                             disabled={openingChat || loading || initialisingSession || deletingChat}
                                         >
-                                            <strong>{chat.title || "Untitled Chat"}</strong>
+                                            <strong title={chat.title || "Untitled Chat"}>
+                                                {chat.title || "Untitled Chat"}
+                                            </strong>
                                             {chat.document_title && (
-                                                <span>{chat.document_title}</span>
+                                                <span title={chat.document_title}>
+                                                    {chat.document_title}
+                                                </span>
                                             )}
                                         </button>
                                         <button
