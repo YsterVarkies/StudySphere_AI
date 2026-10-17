@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";  // React hooks, useState- stores c
 import "./RevisionHub.css"; // imports the CSS file for this component
 
 const API_URL = "http://localhost:5000/api"; // base URL for Backend API
+const MAX_QUIZZES = 20; //Max saved quizzes per student
+const MAX_FLASHCARD_SETS = 20; //Max saved flashcard sets per student
 
 
 /* Session Helpers */
@@ -306,6 +308,18 @@ function RevisionHub() {
     async function generate(type) {
         setError(""); //clear error 
 
+        //prevent generating quizzes when limit reached
+        if (type === "quiz" && totalQuizzes >= MAX_QUIZZES) {
+            setError(`You've reached your limit of ${MAX_QUIZZES} saved quizzes. Delete an existing quiz before generating another.`);
+            return;
+        }
+
+        //prevent generating flashcards when limit reached
+        if (type === "flashcards" && totalFlashcardSets >= MAX_FLASHCARD_SETS) {
+            setError(`You've reached your limit of ${MAX_FLASHCARD_SETS} saved flashcard sets. Delete an existing flashcard set before generating another.`);
+            return;
+        }
+
         // make sure the user selects a document 
         if (!selectedDocument) {
             setError("Please select a document.");
@@ -421,6 +435,7 @@ function RevisionHub() {
                 data;
 
             setContent(generated); // store content in React state
+            await loadPreviousRevision(); //refresh saved revision
         } catch (error) {
             console.error(`Generate ${type} error:`, error);
             setContent(null);
@@ -606,6 +621,13 @@ function RevisionHub() {
         setError("");
     }
 
+    /* Storage counts */
+    const totalQuizzes = savedQuizzes.length; //count saved quizzes
+    const totalFlashcardSets = savedFlashcards.length; //count saved flashcards
+
+    const remainingQuizzes = Math.max(MAX_QUIZZES - totalQuizzes, 0);//calculate the remaining slots
+    const remainingFlashcards = Math.max(MAX_FLASHCARD_SETS - totalFlashcardSets, 0);
+
     /*Search, filter, and pagination for saved quizzes and flashcards*/
     const HISTORY_ITEMS_PER_PAGE = 5;
 
@@ -737,7 +759,234 @@ function RevisionHub() {
                         }
                     </button>
                 </div>
+                {/* ERROR MESSAGE */}
+                {error && (
+                    <div className="revision-hub-page__error">
+                        {error}
+                    </div>
+                )}
             </section>
+            {/* QUIZ */}
+            {mode === "quiz" && questions.length > 0 && currentQuizQuestion && (
+                <section id="revision-hub-active-content" className="revision-hub-page__content">
+                    <div className="revision-hub-page__quiz-header">
+                        <div>
+                            <h2>Quiz</h2>
+
+                            <p>
+                                {difficulty.charAt(0).toUpperCase() +
+                                    difficulty.slice(1)}{" "}
+                                difficulty
+                            </p>
+                        </div>
+                        <span>
+                            Question {currentQuestion + 1} of {""}
+                            {questions.length}
+                        </span>
+                    </div>
+
+                    <div className="revision-hub-page__progress">
+                        <div className="revision-hub-page__progress-bar"
+                            style={{
+                                width: `${((currentQuestion + 1) /
+                                    questions.length) *
+                                    100
+                                    }%`,
+                            }}
+                        />
+                    </div>
+                    {/* QUESTION */}
+                    <article className="revision-hub-page__question">
+                        <h3>
+                            {getQuestionText(currentQuizQuestion)}
+                        </h3>
+                        {/* ANSWER OPTIONS */}
+                        <div>
+                            {getQuestionOptions(currentQuizQuestion).map((option, optionIndex) => {
+                                const value = getOptionText(option);
+
+                                const isSelected =
+                                    selectedAnswer[currentQuestion] === optionIndex;
+
+                                const isCorrect = isAnswerCorrect(
+                                    currentQuizQuestion,
+                                    optionIndex
+                                );
+
+                                let optionClass = "revision-hub-page__option";
+
+                                if (isSelected && isCorrect) {
+                                    optionClass += " revision-hub-page__option--correct";
+                                } else if (isSelected && !isCorrect) {
+                                    optionClass += " revision-hub-page__option--wrong";
+                                }
+
+                                return (
+                                    <button
+                                        type="button"
+                                        key={optionIndex}
+                                        className={optionClass}
+                                        onClick={() => {
+                                            setSelectedAnswer((previous) => ({
+                                                ...previous,
+                                                [currentQuestion]: optionIndex,
+                                            }));
+
+                                            setShowAnswer(true);
+                                        }}
+                                    >
+                                        <span>{value}</span>
+
+                                        {isSelected && (
+                                            <span className="revision-hub-page__option-result">
+                                                {isCorrect ? "✓ Correct" : "✕ Incorrect"}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {getQuestionOptions(currentQuizQuestion).length === 0 && (
+                            <p className="revision-hub-page__no-options">
+                                This question does not have multiple-choice options.
+                            </p>
+                        )}
+                        {/* SHOW CORRECT ANSWER AND EXPLANATION */}
+                        {showAnswer && (
+                            <div className="revision-hub-page__correct-answer" >
+                                <strong>Answer</strong>
+                                <p>
+                                    {getOptionText(getCorrectOption(currentQuizQuestion)) || "The correct answer is unavailable."}
+                                </p>
+                                <strong>Explanation</strong>
+                                <p>
+                                    {getAnswerExplanation(currentQuizQuestion) || "No explanation available."}
+                                </p>
+                            </div>
+                        )}
+                    </article>
+                    {/* QUIZ NAVIGATION */}
+                    <div className="revision-hub-page__quiz-actions" >
+                        <button
+                            type="button"
+                            className="revision-hub-page__secondary-button"
+                            onClick={previousQuestion}
+                            disabled={currentQuestion === 0}
+                        >
+                            Previous
+                        </button>
+                        {/* TOGGLE ANSWER BETWEEN VISIBLE AND HIDDEN */}
+                        <button
+                            type="button"
+                            className="revision-hub-page__answer-button"
+                            onClick={() => {
+                                if (showAnswer) {
+                                    //clear the selection when hiding the answer
+                                    setSelectedAnswer((previous) => {
+                                        const updated = { ...previous };
+                                        delete updated[currentQuestion];
+                                        return updated;
+                                    });
+                                }
+                                setShowAnswer((current) => !current);
+                            }}
+                        >
+                            {showAnswer
+                                ? "Hide answer"
+                                : "Show answer"}
+                        </button>
+
+                        <button
+                            type="button"
+                            className="revision-hub-page__next-button"
+                            onClick={nextQuestion}
+                            disabled={
+                                currentQuestion ===
+                                questions.length - 1
+                            }
+                        >
+                            Next
+                        </button>
+                    </div>
+                </section>
+            )}
+            {/* FLASHCARDS */}
+            {mode === "flashcards" && cards.length > 0 && currentCard && (
+                <section id="revision-hub-active-content" className="revision-hub-page__flashcards">
+                    <div className="revision-hub-page__flashcards-header">
+                        <div>
+                            <h2>Flashcards</h2>
+                            <p>Click the card to reveal the answer.</p>
+                        </div>
+
+                        <span> Card {currentQuestion + 1} of {" "} {cards.length} </span>
+                    </div>
+                    {/* FLASHCARD PROGRESS */}
+                    <div className="revision-hub-page__progress">
+                        <div className="revision-hub-page__progress-bar"
+                            style={{
+                                width: `${((currentQuestion + 1) / cards.length) * 100}%`,
+                            }}
+                        />
+                    </div>
+                    {/* FLASHCARD */}
+                    <button
+                        type="button"
+                        className="revision-hub-page__flashcard"
+                        onClick={() =>
+                            setShowAnswer((current) => !current)
+                        }
+                    >
+                        <span> {showAnswer ? "Answer" : "Question"} </span>
+
+                        <strong>
+                            {!showAnswer
+                                ? currentCard.front_text ||
+                                currentCard.question ||
+                                currentCard.front ||
+                                currentCard.term ||
+                                "Question"
+                                : currentCard.back_text ||
+                                currentCard.answer ||
+                                currentCard.back ||
+                                currentCard.definition ||
+                                "Answer"}
+                        </strong>
+                        <small>
+                            {showAnswer
+                                ? "Click to see the question"
+                                : "Click to reveal the answer"}
+                        </small>
+                    </button>
+
+                    {/* FLASHCARD NAVIGATION */}
+                    <div className="revision-hub-page__flashcard-actions">
+                        <button
+                            type="button"
+                            className="revision-hub-page__secondary-button"
+                            onClick={previousCard}
+                            disabled={currentQuestion === 0}
+                        >
+                            Previous
+                        </button>
+
+                        <button
+                            type="button"
+                            className="revision-hub-page__next-button"
+                            onClick={nextCard}
+                            disabled={currentQuestion === cards.length - 1}
+                        >
+                            Next
+                        </button>
+                    </div>
+                </section>
+            )}
+            {/* EMPTY STATE */}
+            {!loading && mode && questions.length === 0 && cards.length === 0 && !error && (
+                <div className="revision-hub-page__empty">
+                    No revision content was returned.
+                </div>
+            )}
 
             {/* PREVIOUSLY SAVED REVISION CONTENT */}
             <section className="revision-hub-page__history">
@@ -755,6 +1004,18 @@ function RevisionHub() {
                         {historyLoading ? "Refreshing..." : "Refresh"}
                     </button>
                 </div>
+
+                {message && (
+                    <p className="revision-hub-page__success">
+                        {message}
+                    </p>
+                )}
+
+                {historyError && (
+                    <p className="revision-hub-page__error">
+                        {historyError}
+                    </p>
+                )}
 
                 <div className="revision-hub-page__history-filters">
                     <input
@@ -781,17 +1042,35 @@ function RevisionHub() {
                         <option value="flashcards">Flashcards</option>
                     </select>
                 </div>
-                {message && (
-                    <p className="revision-hub-page__success">
-                        {message}
-                    </p>
-                )}
 
-                {historyError && (
-                    <p className="revision-hub-page__error">
-                        {historyError}
-                    </p>
-                )}
+                {/* Revision storage counters */}
+                <div className="revision-hub-page__storage-counts">
+                    <div>
+                        <strong>Saved Quizzes: {totalQuizzes} / {MAX_QUIZZES}</strong>
+                        <span>{remainingQuizzes} {remainingQuizzes === 1 ? " slot" : " slots"} remaining</span>
+
+                        {/* warning quiz storage limit */}
+                        {totalQuizzes >= MAX_QUIZZES && (
+                            <p className="revision-hub-page__storage-warning">
+                                You've reached your limit of {MAX_QUIZZES} saved quizzes.
+                                You can still open existing quizzes, but you'll need to delete one before generating another.
+                            </p>
+                        )}
+                    </div>
+
+                    <div>
+                        <strong>Saved Flashcards: {totalFlashcardSets} / {MAX_FLASHCARD_SETS}</strong>
+                        <span>{remainingFlashcards} {remainingFlashcards === 1 ? " slot" : " slots"} remaining</span>
+
+                        {/* warning flashcard storage limit */}
+                        {totalFlashcardSets >= MAX_FLASHCARD_SETS && (
+                            <p className="revision-hub-page__storage-warning">
+                                You've reached your limit of {MAX_FLASHCARD_SETS} saved flashcard sets.
+                                You can still open existing flashcards, but you'll need to delete one before generating another.
+                            </p>
+                        )}
+                    </div>
+                </div>
 
                 {historyLoading ? (
                     <p>Loading previous revisions...</p>
@@ -953,234 +1232,6 @@ function RevisionHub() {
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
-
-            {/* ERROR MESSAGE */}
-            {error && (
-                <div className="revision-hub-page__error">
-                    {error}
-                </div>
-            )}
-            {/* QUIZ */}
-            {mode === "quiz" && questions.length > 0 && currentQuizQuestion && (
-                <section id="revision-hub-active-content" className="revision-hub-page__content">
-                    <div className="revision-hub-page__quiz-header">
-                        <div>
-                            <h2>Quiz</h2>
-
-                            <p>
-                                {difficulty.charAt(0).toUpperCase() +
-                                    difficulty.slice(1)}{" "}
-                                difficulty
-                            </p>
-                        </div>
-                        <span>
-                            Question {currentQuestion + 1} of {""}
-                            {questions.length}
-                        </span>
-                    </div>
-
-                    <div className="revision-hub-page__progress">
-                        <div className="revision-hub-page__progress-bar"
-                            style={{
-                                width: `${((currentQuestion + 1) /
-                                    questions.length) *
-                                    100
-                                    }%`,
-                            }}
-                        />
-                    </div>
-                    {/* QUESTION */}
-                    <article className="revision-hub-page__question">
-                        <h3>
-                            {getQuestionText(currentQuizQuestion)}
-                        </h3>
-                        {/* ANSWER OPTIONS */}
-                        <div>
-                            {getQuestionOptions(currentQuizQuestion).map((option, optionIndex) => {
-                                const value = getOptionText(option);
-
-                                const isSelected =
-                                    selectedAnswer[currentQuestion] === optionIndex;
-
-                                const isCorrect = isAnswerCorrect(
-                                    currentQuizQuestion,
-                                    optionIndex
-                                );
-
-                                let optionClass = "revision-hub-page__option";
-
-                                if (isSelected && isCorrect) {
-                                    optionClass += " revision-hub-page__option--correct";
-                                } else if (isSelected && !isCorrect) {
-                                    optionClass += " revision-hub-page__option--wrong";
-                                }
-
-                                return (
-                                    <button
-                                        type="button"
-                                        key={optionIndex}
-                                        className={optionClass}
-                                        onClick={() => {
-                                            setSelectedAnswer((previous) => ({
-                                                ...previous,
-                                                [currentQuestion]: optionIndex,
-                                            }));
-
-                                            setShowAnswer(true);
-                                        }}
-                                    >
-                                        <span>{value}</span>
-
-                                        {isSelected && (
-                                            <span className="revision-hub-page__option-result">
-                                                {isCorrect ? "✓ Correct" : "✕ Incorrect"}
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        {getQuestionOptions(currentQuizQuestion).length === 0 && (
-                            <p className="revision-hub-page__no-options">
-                                This question does not have multiple-choice options.
-                            </p>
-                        )}
-                        {/* SHOW CORRECT ANSWER AND EXPLANATION */}
-                        {showAnswer && (
-                            <div className="revision-hub-page__correct-answer" >
-                                <strong>Answer</strong>
-                                <p>
-                                    {getOptionText(getCorrectOption(currentQuizQuestion)) || "The correct answer is unavailable."}
-                                </p>
-                                <strong>Explanation</strong>
-                                <p>
-                                    {getAnswerExplanation(currentQuizQuestion) || "No explanation available."}
-                                </p>
-                            </div>
-                        )}
-                    </article>
-                    {/* QUIZ NAVIGATION */}
-                    <div className="revision-hub-page__quiz-actions" >
-                        <button
-                            type="button"
-                            className="revision-hub-page__secondary-button"
-                            onClick={previousQuestion}
-                            disabled={currentQuestion === 0}
-                        >
-                            Previous
-                        </button>
-                        {/* TOGGLE ANSWER BETWEEN VISIBLE AND HIDDEN */}
-                        <button
-                            type="button"
-                            className="revision-hub-page__answer-button"
-                            onClick={() =>{
-                                if (showAnswer) {
-                                    //clear the selection when hiding the answer
-                                    setSelectedAnswer((previous) => {
-                                        const updated = {...previous};
-                                        delete updated[currentQuestion];
-                                        return updated;
-                                    });
-                                }
-                                setShowAnswer((current) => !current);
-                            }}
-                        >
-                            {showAnswer
-                                ? "Hide answer"
-                                : "Show answer"}
-                        </button>
-
-                        <button
-                            type="button"
-                            className="revision-hub-page__next-button"
-                            onClick={nextQuestion}
-                            disabled={
-                                currentQuestion ===
-                                questions.length - 1
-                            }
-                        >
-                            Next
-                        </button>
-                    </div>
-                </section>
-            )}
-            {/* FLASHCARDS */}
-            {mode === "flashcards" && cards.length > 0 && currentCard && (
-                <section id="revision-hub-active-content" className="revision-hub-page__flashcards">
-                    <div className="revision-hub-page__flashcards-header">
-                        <div>
-                            <h2>Flashcards</h2>
-                            <p>Click the card to reveal the answer.</p>
-                        </div>
-
-                        <span> Card {currentQuestion + 1} of {" "} {cards.length} </span>
-                    </div>
-                    {/* FLASHCARD PROGRESS */}
-                    <div className="revision-hub-page__progress">
-                        <div className="revision-hub-page__progress-bar"
-                            style={{
-                                width: `${((currentQuestion + 1) / cards.length) * 100}%`,
-                            }}
-                        />
-                    </div>
-                    {/* FLASHCARD */}
-                    <button
-                        type="button"
-                        className="revision-hub-page__flashcard"
-                        onClick={() =>
-                            setShowAnswer((current) => !current)
-                        }
-                    >
-                        <span> {showAnswer ? "Answer" : "Question"} </span>
-
-                        <strong>
-                            {!showAnswer
-                                ? currentCard.front_text ||
-                                currentCard.question ||
-                                currentCard.front ||
-                                currentCard.term ||
-                                "Question"
-                                : currentCard.back_text ||
-                                currentCard.answer ||
-                                currentCard.back ||
-                                currentCard.definition ||
-                                "Answer"}
-                        </strong>
-                        <small>
-                            {showAnswer
-                                ? "Click to see the question"
-                                : "Click to reveal the answer"}
-                        </small>
-                    </button>
-
-                    {/* FLASHCARD NAVIGATION */}
-                    <div className="revision-hub-page__flashcard-actions">
-                        <button
-                            type="button"
-                            className="revision-hub-page__secondary-button"
-                            onClick={previousCard}
-                            disabled={currentQuestion === 0}
-                        >
-                            Previous
-                        </button>
-
-                        <button
-                            type="button"
-                            className="revision-hub-page__next-button"
-                            onClick={nextCard}
-                            disabled={currentQuestion === cards.length - 1}
-                        >
-                            Next
-                        </button>
-                    </div>
-                </section>
-            )}
-            {/* EMPTY STATE */}
-            {!loading && mode && questions.length === 0 && cards.length === 0 && !error && (
-                <div className="revision-hub-page__empty">
-                    No revision content was returned.
                 </div>
             )}
         </main>
