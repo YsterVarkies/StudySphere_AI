@@ -610,14 +610,14 @@ function AIChat({ initialDocument }) {
                         <div className="ai-chat-page__storage-count">
                             <div>Saved Chats: {totalChats} / {MAX_CHATS}</div>
                             <div>{chatsRemaining}{chatsRemaining === 1 ? " slot" : " slots"} remaining</div>
-                        </div>
 
-                        {totalChats >= MAX_CHATS && (
+                            {totalChats >= MAX_CHATS && (
                             <p className="ai-chat-page__storage-warning">
                                 You've reached your limit of {MAX_CHATS} saved chats.
                                 You can continue existing conversations, but you will need to delete a chat before starting a new one.
                             </p>
                         )}
+                        </div>
 
                         <input
                             type="search"

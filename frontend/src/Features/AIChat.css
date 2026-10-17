@@ -863,8 +863,9 @@
 .ai-chat-page__storage-count {
   margin: 12px 0;
   padding: 10px 12px;
-  background: #f8fafc;
+  background: #fffaf5;
   border: 1px solid #e2e8f0;
+  border-left: 4px solid #e8790d;
   border-radius: 8px;
   color: #0a203d;
   font-size: 13px;

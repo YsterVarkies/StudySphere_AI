@@ -119,6 +119,14 @@
   line-height: 1.5;
 }
 
+/* error message */
+.revision-hub-page__controls > .revision-hub-page__error {
+  flex: 1 0 100%;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+
 /* =================================
   Quiz Container
 ================================= */
@@ -128,6 +136,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+  margin-top: 20px;
 }
 
 .revision-hub-page__content h2 {
@@ -378,6 +387,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+  margin-top: 20px;
 }
 
 .revision-hub-page__flashcards-header {
@@ -819,7 +829,10 @@
 
 @media (max-width: 600px) {
     .revision-hub-page__history-filters select {
-        flex: 1 1 100%;
+        grid-template-columns: 1fr;
+    }
+    .revision-hub-page .revision-hub-page__storage-counts {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .revision-hub-page__history-pagination {
@@ -950,3 +963,99 @@
   border-radius: 8px;
   font-size: 14px;
 }
+
+/* Storage counters for Quiz and Flashcards */
+.revision-hub-page__storage-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.revision-hub-page__storage-counts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  background: #fffaf5;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  border-left: 4px solid #e8790d;
+}
+
+.revision-hub-page__storage-counts strong {
+  color: #0a203d;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.revision-hub-page__storage-counts span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+/* Warning storage limit */
+.revision-hub-page__storage-warning {
+  background: #fff1f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 10px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.revision-hub-page__storage-counts .revision-hub-page__storage-warning {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Mobile layout for saved revision cards */
+@media (max-width: 600px) {
+  .revision-hub-page__history-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .revision-hub-page__history-item > div {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .revision-hub-page__history-item > button {
+    align-self: flex-start;
+  }
+}
+
+/* Mobile saved-revision buttons */
+@media (max-width: 600px) {
+    .revision-hub-page__history-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 36px;
+        justify-content: start;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 12px;
+    }
+
+    .revision-hub-page__history-item > div {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .revision-hub-page__history-item > button {
+        align-self: center;
+        margin: 0;
+    }
+
+    .revision-hub-page__history-item > button:not(.revision-hub-page__delete-btn) {
+      width: 100%;
+      min-width: 0;
+    }
+}
+
