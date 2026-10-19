@@ -5,6 +5,21 @@ function getUserId(req) {
   return req.user?.user_id || req.user?.id || null;
 }
 
+function parseModuleId(value) {
+  if (value == null || value === '') return null;
+  const moduleId = Number(value);
+  return Number.isInteger(moduleId) && moduleId > 0 ? moduleId : undefined;
+}
+
+async function moduleExists(moduleId) {
+  if (moduleId === null) return true;
+  const [rows] = await db.execute(
+    'SELECT module_id FROM MODULE WHERE module_id = ?',
+    [moduleId]
+  );
+  return rows.length > 0;
+}
+
 exports.createAnnouncement = async (req, res) => {
   try {
     const userId = getUserId(req);
@@ -12,13 +27,18 @@ exports.createAnnouncement = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const { title, content, moduleId } = req.body;
+    const { title, content } = req.body;
+    const moduleId = parseModuleId(req.body.moduleId);
 
-    if (!title || !content) {
+    if (!title || !content || moduleId === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'title and content are required',
+        message: 'title, content, and a valid module are required',
       });
+    }
+
+    if (!(await moduleExists(moduleId))) {
+      return res.status(400).json({ success: false, message: 'Selected module does not exist' });
     }
 
     const id = await Announcement.create({
@@ -50,6 +70,9 @@ exports.getAnnouncements = async (req, res) => {
     const { moduleId, scope } = req.query;
 
     if (scope === 'admin') {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
       let filter;
       if (moduleId === 'null' || moduleId === '') {
         filter = null;
@@ -93,9 +116,20 @@ exports.getAnnouncements = async (req, res) => {
 
 exports.getAnnouncementById = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const row = await Announcement.getById(parseInt(req.params.id, 10));
     if (!row) {
       return res.status(404).json({ success: false, message: 'Not found' });
+    }
+    if (req.user.role !== 'admin' && row.module_id != null) {
+      const [enrollment] = await db.execute(
+        `SELECT 1
+         FROM USER u
+         INNER JOIN COHORT_MODULE cm ON cm.cohort_id = u.cohort_id
+         WHERE u.user_id = ? AND cm.module_id = ?`,
+        [userId, row.module_id]
+      );
+      if (enrollment.length === 0) return res.status(404).json({ success: false, message: 'Not found' });
     }
     return res.json({ success: true, data: row });
   } catch (error) {
@@ -110,13 +144,18 @@ exports.getAnnouncementById = async (req, res) => {
 exports.updateAnnouncement = async (req, res) => {
   try {
     const announcementId = parseInt(req.params.id, 10);
-    const { title, content, moduleId } = req.body;
+    const { title, content } = req.body;
+    const moduleId = parseModuleId(req.body.moduleId);
 
-    if (!title || !content) {
+    if (!title || !content || moduleId === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'title and content are required',
+        message: 'title, content, and a valid module are required',
       });
+    }
+
+    if (!(await moduleExists(moduleId))) {
+      return res.status(400).json({ success: false, message: 'Selected module does not exist' });
     }
 
     const updated = await Announcement.update(announcementId, {

@@ -22,6 +22,7 @@ const emptyAnnouncement = {
   title: '',
   message: '',
   category: 'General',
+  moduleId: '',
 }
 
 function getTaskStorageKey(email) {
@@ -45,31 +46,40 @@ function saveTasks(email, tasksToSave) {
   }
 }
 
-function getAnnouncementStorageKey(email) {
-  return `studysphere_announcements_${email.toLowerCase()}`
-}
-
-function loadAnnouncements(email) {
-  try {
-    const storedAnnouncements = JSON.parse(localStorage.getItem(getAnnouncementStorageKey(email)) || '[]')
-    return Array.isArray(storedAnnouncements) ? sortAnnouncements(storedAnnouncements) : []
-  } catch {
-    return []
-  }
-}
-
 function sortAnnouncements(announcementsToSort) {
   return [...announcementsToSort].sort((firstAnnouncement, secondAnnouncement) => (
     new Date(secondAnnouncement.publishedAt).getTime() - new Date(firstAnnouncement.publishedAt).getTime()
   ))
 }
 
-function saveAnnouncements(email, announcementsToSave) {
-  try {
-    localStorage.setItem(getAnnouncementStorageKey(email), JSON.stringify(announcementsToSave))
-  } catch {
-    // Announcement state still works for this session if browser storage is unavailable.
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+
+function getAnnouncementHeaders(includeContentType = false) {
+  const session = loadSession()
+  return {
+    ...(includeContentType ? { 'Content-Type': 'application/json' } : {}),
+    ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
   }
+}
+
+function mapAnnouncement(announcement) {
+  return {
+    id: announcement.announcement_id,
+    title: announcement.title,
+    message: announcement.content,
+    category: announcement.module_name || 'General',
+    moduleId: announcement.module_id == null ? '' : String(announcement.module_id),
+    publishedAt: announcement.created_at,
+  }
+}
+
+async function loadAdminAnnouncements() {
+  const response = await fetch(`${API_URL}/announcements?scope=admin`, {
+    headers: getAnnouncementHeaders(),
+  })
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(result.message || 'Announcements could not be loaded.')
+  return sortAnnouncements((result.data || []).map(mapAnnouncement))
 }
 
 function loadSession() {
@@ -120,12 +130,29 @@ async function loadDashboardData(token) {
 async function refreshDashboardForUser(user) {
   if (!user) return dashboardEmptyState
 
-  try {
-    const session = loadSession()
-    return await loadDashboardData(session?.token || '')
-  } catch {
-    return dashboardEmptyState
-  }
+  const session = loadSession()
+  return loadDashboardData(session?.token || '')
+}
+
+async function savePlannerDeadline(method, deadlineId, task) {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+  const session = loadSession()
+  const response = await fetch(`${apiUrl}/dashboard/deadlines${deadlineId ? `/${deadlineId}` : ''}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: session?.token ? `Bearer ${session.token}` : '',
+    },
+    ...(method === 'DELETE' ? {} : {
+      body: JSON.stringify({
+        title: task.title,
+        dueAt: `${task.date}T${task.time || '23:59'}:00`,
+      }),
+    }),
+  })
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(result.message || 'Planner task could not be saved.')
+  return result
 }
 
 function formatTaskDate(task) {
@@ -195,24 +222,33 @@ function PlannerClock() {
 function TaskForm({ task, onSave, onCancel }) {
   const [formData, setFormData] = useState(task || emptyTask)
   const [formError, setFormError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   function updateField(field, value) {
     setFormData((current) => ({ ...current, [field]: value }))
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     if (!formData.title.trim() || !formData.subject.trim() || !formData.date || !formData.time) {
       setFormError('Please complete the task title, subject, date, and time.')
       return
     }
 
-    onSave({
-      ...formData,
-      title: formData.title.trim(),
-      subject: formData.subject.trim(),
-      description: formData.description.trim(),
-    })
+    setIsSaving(true)
+    setFormError('')
+    try {
+      await onSave({
+        ...formData,
+        title: formData.title.trim(),
+        subject: formData.subject.trim(),
+        description: formData.description.trim(),
+      })
+    } catch (error) {
+      setFormError(error.message || 'Planner task could not be saved.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -260,7 +296,7 @@ function TaskForm({ task, onSave, onCancel }) {
         {formError && <p className="task-form-error" role="alert">{formError}</p>}
         <div className="task-modal-actions">
           <button className="modal-secondary-button" type="button" onClick={onCancel}>Cancel</button>
-          <button className="planner-button" type="submit">{task ? 'Save changes' : 'Save task'}</button>
+          <button className="planner-button" type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : task ? 'Save changes' : 'Save task'}</button>
         </div>
       </form>
     </div>
@@ -270,23 +306,53 @@ function TaskForm({ task, onSave, onCancel }) {
 function AnnouncementForm({ announcement, onSave, onCancel }) {
   const [formData, setFormData] = useState(announcement || emptyAnnouncement)
   const [formError, setFormError] = useState('')
+  const [modules, setModules] = useState([])
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${API_URL}/modules`, { headers: getAnnouncementHeaders() })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(result.message || 'Modules could not be loaded.')
+        return result.modules || []
+      })
+      .then((moduleList) => {
+        if (!cancelled) setModules(moduleList)
+      })
+      .catch((error) => {
+        if (!cancelled) setFormError(error.message || 'Modules could not be loaded.')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function updateField(field, value) {
     setFormData((current) => ({ ...current, [field]: value }))
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     if (!formData.title.trim() || !formData.message.trim() || !formData.category) {
       setFormError('Please complete the title, message, and category.')
       return
     }
 
-    onSave({
-      ...formData,
-      title: formData.title.trim(),
-      message: formData.message.trim(),
-    })
+    setIsSaving(true)
+    setFormError('')
+    try {
+      await onSave({
+        ...formData,
+        title: formData.title.trim(),
+        message: formData.message.trim(),
+      })
+    } catch (error) {
+      setFormError(error.message || 'Announcement could not be saved.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -318,12 +384,19 @@ function AnnouncementForm({ announcement, onSave, onCancel }) {
               <option>Deadline</option>
             </select>
           </label>
+          <label className="task-form-field task-form-field-wide">
+            Module
+            <select value={formData.moduleId || ''} onChange={(event) => updateField('moduleId', event.target.value)}>
+              <option value="">General announcement (all students)</option>
+              {modules.map((module) => <option key={module.module_id} value={module.module_id}>{module.module_code} — {module.module_name}</option>)}
+            </select>
+          </label>
         </div>
 
         {formError && <p className="task-form-error" role="alert">{formError}</p>}
         <div className="task-modal-actions">
           <button className="modal-secondary-button" type="button" onClick={onCancel}>Cancel</button>
-          <button className="planner-button" type="submit">{announcement ? 'Save changes' : 'Publish announcement'}</button>
+          <button className="planner-button" type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : announcement ? 'Save changes' : 'Publish announcement'}</button>
         </div>
       </form>
     </div>
@@ -396,8 +469,11 @@ function DashboardOverview({
   onEditTask,
   onDeleteTask,
   onToggleTask,
+  dashboardLoadState,
+  completedDeadlineIds,
 }) {
   const { activeModules, upcomingDeadlines, aiQuestionsThisWeek, recentDocuments, announcements } = dashboardData
+  const visibleDeadlines = upcomingDeadlines.items.filter((deadline) => !completedDeadlineIds.includes(String(deadline.id)))
   const [currentTime] = useState(() => Date.now())
   const formatFileSize = (bytes) => bytes < 1024 * 1024
     ? `${Math.max(1, Math.round(bytes / 1024))} KB`
@@ -446,20 +522,20 @@ function DashboardOverview({
         </article>
         <article className="dashboard-stat-card panel">
           <h2>Upcoming deadlines</h2>
-          <strong>{upcomingDeadlines.count}</strong>
-          <p>{upcomingDeadlines.items.filter((item) => (new Date(item.dueAt).getTime() - currentTime) <= 48 * 60 * 60 * 1000).length} due within 48 hours</p>
+          <strong>{dashboardLoadState === 'ready' ? visibleDeadlines.length : '—'}</strong>
+          <p>{dashboardLoadState === 'ready' ? `${visibleDeadlines.filter((item) => (new Date(item.dueAt).getTime() - currentTime) <= 48 * 60 * 60 * 1000).length} due within 48 hours` : dashboardLoadState === 'loading' ? 'Loading deadlines...' : 'Deadline data unavailable'}</p>
         </article>
         <article className="dashboard-stat-card panel">
           <h2>AI questions this week</h2>
-          <strong>{aiQuestionsThisWeek.count}</strong>
-          <p>of {aiQuestionsThisWeek.weeklyLimit} weekly limit</p>
+          <strong>{dashboardLoadState === 'ready' ? aiQuestionsThisWeek.count : '—'}</strong>
+          <p>{dashboardLoadState === 'ready' ? `of ${aiQuestionsThisWeek.weeklyLimit} weekly limit` : dashboardLoadState === 'loading' ? 'Loading usage...' : 'Usage data unavailable'}</p>
         </article>
       </section>
 
       <section className="dashboard-bottom-grid">
         <article className="dashboard-list-card panel">
           <div className="dashboard-card-heading"><h2>Upcoming deadlines</h2><span>{upcomingDeadlines.count}</span></div>
-          {upcomingDeadlines.items.length ? upcomingDeadlines.items.map((deadline) => (
+          {dashboardLoadState === 'loading' ? <p className="dashboard-empty-state">Loading dashboard data...</p> : dashboardLoadState === 'error' ? <p className="dashboard-empty-state" role="alert">Dashboard data could not be loaded. Try again when your connection is restored.</p> : visibleDeadlines.length ? visibleDeadlines.map((deadline) => (
             <div className="dashboard-deadline-row" key={deadline.id}>
               <span className={`dashboard-deadline-icon ${deadline.type}`}>{deadline.type.charAt(0).toUpperCase()}</span>
               <div className="dashboard-list-copy"><strong>{deadline.module ? `${deadline.module} — ` : ''}{deadline.title}</strong><small>Due {formatDeadline(deadline.dueAt)}</small></div>
@@ -800,10 +876,8 @@ function App() {
   const [activeNav, setActiveNav] = useState(() => loadSession()?.user?.role === 'admin' ? 'analytics' : 'dashboard')
   const [authView, setAuthView] = useState('login')
   const [user, setUser] = useState(() => loadSession()?.user || null)
-  const [announcements, setAnnouncements] = useState(() => {
-    const restoredUser = loadSession()?.user
-    return restoredUser ? loadAnnouncements(restoredUser.email) : []
-  })
+  const [announcements, setAnnouncements] = useState([])
+  const [announcementError, setAnnouncementError] = useState('')
   const [sessionDate, setSessionDate] = useState(() => new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     day: 'numeric',
@@ -817,6 +891,7 @@ function App() {
   const [announcementModal, setAnnouncementModal] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
   const [dashboardData, setDashboardData] = useState(dashboardEmptyState)
+  const [dashboardLoadState, setDashboardLoadState] = useState('loading')
 
   useEffect(() => {
     if (!successMessage) return undefined
@@ -828,13 +903,37 @@ function App() {
   useEffect(() => {
     let cancelled = false
     refreshDashboardForUser(user).then((nextDashboardData) => {
-      if (!cancelled) setDashboardData(nextDashboardData)
+      if (!cancelled) {
+        setDashboardData(nextDashboardData)
+        setDashboardLoadState('ready')
+      }
+    }).catch(() => {
+      if (!cancelled) setDashboardLoadState('error')
     })
-    const handleWindowFocus = () => refreshDashboardForUser(user).then(setDashboardData)
+    const handleWindowFocus = () => refreshDashboardForUser(user).then((nextDashboardData) => {
+      setDashboardData(nextDashboardData)
+      setDashboardLoadState('ready')
+    }).catch(() => setDashboardLoadState('error'))
     window.addEventListener('focus', handleWindowFocus)
     return () => {
       cancelled = true
       window.removeEventListener('focus', handleWindowFocus)
+    }
+  }, [user, activeNav])
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin' || activeNav !== 'announcements') return undefined
+    let cancelled = false
+    loadAdminAnnouncements().then((nextAnnouncements) => {
+      if (!cancelled) {
+        setAnnouncements(nextAnnouncements)
+        setAnnouncementError('')
+      }
+    }).catch((error) => {
+      if (!cancelled) setAnnouncementError(error.message || 'Announcements could not be loaded.')
+    })
+    return () => {
+      cancelled = true
     }
   }, [user, activeNav])
 
@@ -855,16 +954,18 @@ function App() {
     }
 
     setUser(authenticatedUser)
+    setDashboardLoadState('loading')
     saveSession({ token, user: authenticatedUser })
     setActiveNav(authenticatedUser.role === 'admin' ? 'analytics' : 'dashboard')
     setSessionDate(formattedDate)
     setTasks(loadTasks(authenticatedUser.email))
-    setAnnouncements(loadAnnouncements(authenticatedUser.email))
+    setAnnouncements([])
     setSuccessMessage('Successfully logged in!')
   }
 
   function handleLogout() {
     setUser(null)
+    setDashboardLoadState('ready')
     clearSession()
     setSessionDate(null)
     setTasks([])
@@ -881,18 +982,44 @@ function App() {
     saveTasks(user.email, nextTasks)
   }
 
-  function handleSaveTask(taskData) {
+  async function handleSaveTask(taskData) {
+    const previousTask = taskData.id ? tasks.find((task) => task.id === taskData.id) : null
+    const deadline = await savePlannerDeadline(
+      previousTask?.dashboardDeadlineId ? 'PATCH' : 'POST',
+      previousTask?.dashboardDeadlineId,
+      taskData
+    )
+    const savedTask = {
+      ...taskData,
+      id: taskData.id || `${Date.now()}-${Math.random()}`,
+      dashboardDeadlineId: previousTask?.dashboardDeadlineId || deadline.deadlineId,
+      completed: previousTask?.completed || false,
+    }
     const nextTasks = taskData.id
-      ? tasks.map((task) => (task.id === taskData.id ? { ...task, ...taskData } : task))
-      : [{ ...taskData, id: `${Date.now()}-${Math.random()}`, completed: false }, ...tasks]
+      ? tasks.map((task) => (task.id === taskData.id ? savedTask : task))
+      : [savedTask, ...tasks]
     updateTasks(nextTasks)
-    refreshDashboardForUser(user).then(setDashboardData)
+    refreshDashboardForUser(user).then((nextDashboardData) => {
+      setDashboardData(nextDashboardData)
+      setDashboardLoadState('ready')
+    }).catch(() => setDashboardLoadState('error'))
     setTaskModal(null)
   }
 
-  function handleDeleteTask(taskId) {
+  async function handleDeleteTask(taskId) {
     if (!window.confirm('Delete this task?')) return
+    const task = tasks.find((candidate) => candidate.id === taskId)
+    try {
+      if (task?.dashboardDeadlineId) await savePlannerDeadline('DELETE', task.dashboardDeadlineId, task)
+    } catch (error) {
+      window.alert(error.message || 'Planner task could not be deleted.')
+      return
+    }
     updateTasks(tasks.filter((task) => task.id !== taskId))
+    refreshDashboardForUser(user).then((nextDashboardData) => {
+      setDashboardData(nextDashboardData)
+      setDashboardLoadState('ready')
+    }).catch(() => setDashboardLoadState('error'))
   }
 
   function handleToggleTask(taskId) {
@@ -901,26 +1028,37 @@ function App() {
     )))
   }
 
-  function updateAnnouncements(nextAnnouncements) {
-    setAnnouncements(nextAnnouncements)
-    saveAnnouncements(user.email, nextAnnouncements)
-  }
-
-  function handleSaveAnnouncement(announcementData) {
-    const nextAnnouncements = announcementData.id
-      ? announcements.map((announcement) => (
-        announcement.id === announcementData.id
-          ? { ...announcement, ...announcementData, publishedAt: announcement.publishedAt }
-          : announcement
-      ))
-      : [{ ...announcementData, id: `${Date.now()}-${Math.random()}`, publishedAt: new Date().toISOString() }, ...announcements]
-    updateAnnouncements(sortAnnouncements(nextAnnouncements))
+  async function handleSaveAnnouncement(announcementData) {
+    const response = await fetch(`${API_URL}/announcements${announcementData.id ? `/${announcementData.id}` : ''}`, {
+      method: announcementData.id ? 'PUT' : 'POST',
+      headers: getAnnouncementHeaders(true),
+      body: JSON.stringify({
+        title: announcementData.title,
+        content: announcementData.message,
+        moduleId: announcementData.moduleId || null,
+      }),
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(result.message || 'Announcement could not be saved.')
+    setAnnouncements(await loadAdminAnnouncements())
+    setAnnouncementError('')
     setAnnouncementModal(null)
   }
 
-  function handleDeleteAnnouncement(announcementId) {
+  async function handleDeleteAnnouncement(announcementId) {
     if (!window.confirm('Delete this announcement?')) return
-    updateAnnouncements(announcements.filter((announcement) => announcement.id !== announcementId))
+    try {
+      const response = await fetch(`${API_URL}/announcements/${announcementId}`, {
+        method: 'DELETE',
+        headers: getAnnouncementHeaders(),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.message || 'Announcement could not be deleted.')
+      setAnnouncements(await loadAdminAnnouncements())
+      setAnnouncementError('')
+    } catch (error) {
+      setAnnouncementError(error.message || 'Announcement could not be deleted.')
+    }
   }
 
   if (!user) {
@@ -1049,12 +1187,6 @@ function App() {
             </button>
           </div>}
 
-          <div className="nav-group preview">
-            <button className="nav-item" type="button">
-              <span className="nav-icon login"></span>
-              Login / register screen
-            </button>
-          </div>
         </nav>
 
         <div className="profile-box">
@@ -1084,6 +1216,8 @@ function App() {
             onEditTask={setTaskModal}
             onDeleteTask={handleDeleteTask}
             onToggleTask={handleToggleTask}
+            dashboardLoadState={dashboardLoadState}
+            completedDeadlineIds={tasks.filter((task) => task.completed && task.dashboardDeadlineId).map((task) => String(task.dashboardDeadlineId))}
           />
         ) : currentNav === 'planner' ? (
           <section className="planner-view focused">
@@ -1127,7 +1261,10 @@ function App() {
         ): currentNav === 'study-materials' ? (
           <StudyMaterials />
         ): currentNav === 'ai-chat' ? (
-          <AIChat />
+          <AIChat onQuestionSubmitted={() => refreshDashboardForUser(user).then((nextDashboardData) => {
+            setDashboardData(nextDashboardData)
+            setDashboardLoadState('ready')
+          }).catch(() => setDashboardLoadState('error'))} />
         ): currentNav === 'revision' ? (
           <RevisionHub />
         ) : currentNav === 'profile' ? (
@@ -1160,7 +1297,7 @@ function App() {
 
             <div className="published-panel panel announcement-read-only">
               <div className="published-header">Available announcements</div>
-              {announcements.length > 0 ? (
+              {announcementError ? <p className="announcement-empty" role="alert">{announcementError}</p> : announcements.length > 0 ? (
                 <div className="announcement-list">
                   {announcements.map((item) => (
                     <AnnouncementItem
