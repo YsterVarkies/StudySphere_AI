@@ -45,9 +45,12 @@ function getToken() {
 }
 
 /* MAIN COMPONENT */
-function AIChat({ initialDocument }) {
+function AIChat({ initialDocument, onQuestionSubmitted }) {
     const initialDocumentId = initialDocument ? initialDocument.document_id || initialDocument.id : null; // if the component is opened from studyMaterials, we may have an initial document to select
     const sessionInitialisingRef = useRef(false); // to prevent multiple simultaneous session initialisation requests
+    const sendingQuestionRef = useRef(false);
+    const requestIdRef = useRef(null);
+    const requestQuestionRef = useRef(null);
     const [documents, setDocuments] = useState([]); // list of documents available to the user
     const [selectedDocuments, setSelectedDocuments] = useState(initialDocumentId ? [initialDocumentId] : []); // list of selected documents (only one document can be selected at a time)
     const [sessionId, setSessionId] = useState(null);// the current chat session id
@@ -445,11 +448,19 @@ function AIChat({ initialDocument }) {
     async function sendQuestion(event) {
         event.preventDefault();
 
-        if (!question.trim() || loading) {
+        if (!question.trim() || sendingQuestionRef.current) {
             return;
         }
 
+        sendingQuestionRef.current = true;
         const currentQuestion = question.trim();
+        if (!requestIdRef.current || requestQuestionRef.current !== currentQuestion) {
+            requestIdRef.current = globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+                const randomValue = Math.random() * 16 | 0;
+                return (character === 'x' ? randomValue : (randomValue & 0x3 | 0x8)).toString(16);
+            });
+            requestQuestionRef.current = currentQuestion;
+        }
         setQuestion("");
         setError("");
 
@@ -493,6 +504,7 @@ function AIChat({ initialDocument }) {
                     userId: getUserId(),
                     sessionId: Number(activeSessionId),
                     message: currentQuestion,
+                    requestId: requestIdRef.current,
                 }),
             });
 
@@ -522,6 +534,9 @@ function AIChat({ initialDocument }) {
                     sources: data.sources || data.citations || [],
                 },
             ]);
+            requestIdRef.current = null;
+            requestQuestionRef.current = null;
+            onQuestionSubmitted?.();
         } catch (error) {
             console.error("AI chat error:", error);
 
@@ -539,6 +554,7 @@ function AIChat({ initialDocument }) {
             setError(error.message || "The AI service is temporarily unavailable. Please try again in a moment.");
         }
         finally {
+            sendingQuestionRef.current = false;
             setLoading(false);
         }
     }

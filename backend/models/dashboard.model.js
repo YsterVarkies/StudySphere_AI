@@ -61,7 +61,10 @@ async function getDashboardData(user) {
      FROM ANNOUNCEMENT a
      LEFT JOIN MODULE m ON m.module_id = a.module_id
      ${isAdmin ? '' : `WHERE a.module_id IS NULL OR EXISTS (
-       SELECT 1 FROM USER_MODULE um WHERE um.user_id = ? AND um.module_id = a.module_id
+       SELECT 1
+       FROM USER u
+       INNER JOIN COHORT_MODULE cm ON cm.cohort_id = u.cohort_id
+       WHERE u.user_id = ? AND cm.module_id = a.module_id
      )`}
      ORDER BY a.created_at DESC
      LIMIT 10`,
@@ -115,6 +118,47 @@ async function getDashboardData(user) {
   };
 }
 
+async function createPlannerDeadline(userId, { title, dueAt }) {
+  const [result] = await db.query(
+    `INSERT INTO DASHBOARD_DEADLINE (user_id, title, due_at, item_type)
+     VALUES (?, ?, ?, 'study')`,
+    [userId, title, dueAt]
+  );
+  return result.insertId;
+}
+
+async function updatePlannerDeadline(userId, deadlineId, { title, dueAt }) {
+  const [result] = await db.query(
+    `UPDATE DASHBOARD_DEADLINE
+     SET title = ?, due_at = ?
+     WHERE deadline_id = ? AND user_id = ? AND item_type = 'study'`,
+    [title, dueAt, deadlineId, userId]
+  );
+  return result.affectedRows > 0;
+}
+
+async function deletePlannerDeadline(userId, deadlineId) {
+  const [result] = await db.query(
+    `DELETE FROM DASHBOARD_DEADLINE
+     WHERE deadline_id = ? AND user_id = ? AND item_type = 'study'`,
+    [deadlineId, userId]
+  );
+  return result.affectedRows > 0;
+}
+
+async function recordSuccessfulAiQuestion(userId, requestId) {
+  await db.query(
+    `INSERT INTO AI_CHAT_USAGE (user_id, request_id)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE usage_id = LAST_INSERT_ID(usage_id)`,
+    [userId, requestId]
+  );
+}
+
 module.exports = {
   getDashboardData,
+  createPlannerDeadline,
+  updatePlannerDeadline,
+  deletePlannerDeadline,
+  recordSuccessfulAiQuestion,
 };

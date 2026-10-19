@@ -140,11 +140,12 @@ exports.sendMessage = async (req, res) => {
     }
 
     const { sessionId, message } = req.body;
+    const requestId = req.body.requestId;
 
-    if (!sessionId || !message) {
+    if (!sessionId || !message || typeof requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
       return res.status(400).json({
         success: false,
-        message: 'sessionId and message are required',
+        message: 'sessionId, message, and a valid requestId are required',
       });
     }
 
@@ -155,12 +156,6 @@ exports.sendMessage = async (req, res) => {
         message: 'Chat session not found',
       });
     }
-
-    await AiChat.saveMessage({
-      sessionId,
-      sender: 'user',
-      messageText: message,
-    });
 
     let documentContent = null;
     let fileName = '';
@@ -197,9 +192,16 @@ exports.sendMessage = async (req, res) => {
 
     await AiChat.saveMessage({
       sessionId,
+      sender: 'user',
+      messageText: message,
+    });
+    await AiChat.saveMessage({
+      sessionId,
       sender: 'ai',
       messageText: aiReply,
     });
+    const Dashboard = require('../../models/dashboard.model');
+    await Dashboard.recordSuccessfulAiQuestion(userId, requestId);
 
     return res.status(200).json({
       success: true,
