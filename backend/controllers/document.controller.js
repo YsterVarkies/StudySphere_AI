@@ -242,6 +242,7 @@ const downloadDocument = async (req, res) => {
 };
 
 // Permanently delete a document belonging to the logged-in user
+
 const deleteDocument = async (req, res) => {
     try {
         const userId = req.user.user_id;
@@ -266,29 +267,31 @@ const deleteDocument = async (req, res) => {
             });
         }
 
-        // Delete the actual file from Backblaze B2
-        await storage.send(
-            new DeleteObjectCommand({
-                Bucket: process.env.B2_BUCKET_NAME,
-                Key: document.file_path
-            })
-        );
-
-        // Delete the document record from MySQL
+        // Delete the database record and unlink saved content
         const result = await Document.deleteDocument(
             documentId,
             userId
         );
 
-        // Confirm that a database record was deleted
         if (result.affectedRows === 0) {
-            console.error(
-                `Document ${documentId} was removed from storage, but its database record was not deleted.`
-            );
-
-            return res.status(500).json({
-                message: "The file was removed, but the document record could not be deleted."
+            return res.status(404).json({
+                message: "Document not found."
             });
+        }
+
+        // Delete the file from Backblaze B2 after DB deletion
+        try {
+            await storage.send(
+                new DeleteObjectCommand({
+                    Bucket: process.env.B2_BUCKET_NAME,
+                    Key: document.file_path
+                })
+            );
+        } catch (storageError) {
+            console.error(
+                `Document ${documentId} was deleted from the database, but the file could not be deleted from Backblaze B2.`,
+                storageError
+            );
         }
 
         return res.status(200).json({
@@ -304,6 +307,8 @@ const deleteDocument = async (req, res) => {
         });
     }
 };
+
+
 
 
 module.exports = {
