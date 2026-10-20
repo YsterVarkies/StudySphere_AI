@@ -6,6 +6,7 @@ import "./AIChat.css"; // import the CSS file for styling the AIChat component
 /* GLOBAL CONFIGURATION */
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"; // the base URL for the backend API
 const MAX_CHATS = 20; //Max saved chats per student
+const MAX_QUESTION_LENGTH = 1000;
 
 /* SESSION HELPERS */
 function getSession() {
@@ -317,6 +318,10 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
             return;
         }
 
+        //clear request tracking when starting new chat
+        requestIdRef.current = null;
+        requestQuestionRef.current = null;
+
         setSessionId(null);
         setMessages([]);
         setQuestion("");
@@ -331,10 +336,10 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
 
     function getDocumentName(document) {
         return (
+            document.title ||
             document.name ||
             document.file_name ||
             document.fileName ||
-            document.title ||
             "Document"
         );
     }
@@ -435,6 +440,12 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
 
     /* SELECT/DESELECT DOCUMENT */
     function toggleDocument(id) {
+
+        //prevent document switch when AI response is busy
+        if (sendingQuestionRef.current || loading || initialisingSession || openingChat) {
+            return;
+        }
+
         setSelectedDocuments((current) => {
             if (current.includes(id)) {
                 return current.filter((item) => item !== id
@@ -448,7 +459,12 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
     async function sendQuestion(event) {
         event.preventDefault();
 
-        if (!question.trim() || sendingQuestionRef.current) {
+        if (!question.trim() || sendingQuestionRef.current || openingChat) {
+            return;
+        }
+
+        if (question.trim().length > MAX_QUESTION_LENGTH) {
+            setError(`Questions cannot exceed ${MAX_QUESTION_LENGTH} characters.`);
             return;
         }
 
@@ -486,7 +502,7 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
             }
 
             if (!activeSessionId) {
-                throw new Error(totalChats >= MAX_CHATS 
+                throw new Error(totalChats >= MAX_CHATS
                     ? `You've reached your limit of ${MAX_CHATS} saved chats. You can continue existing conversations, but you will need to delete a chat before starting a new one.`
                     : "Could not create a chat session."
                 );
@@ -562,7 +578,7 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
     /* Storage count */
     const totalChats = previousChats.length; //count chats returned by backend
     const chatsRemaining = Math.max(MAX_CHATS - totalChats, 0); //calculates how many slots remain
- 
+
     /*FILTERS PREVIOUS CHATS */
     const filteredChats = previousChats.filter((chat) => {
         const search = chatSearch.trim().toLowerCase();
@@ -599,6 +615,7 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
                                             : "ai-chat-page__document"
                                     }
                                     onClick={() => toggleDocument(id)}
+                                    disabled={loading || initialisingSession || openingChat}
                                 >
                                     📄 {" "} {getDocumentName(document)}
                                 </button>
@@ -628,11 +645,11 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
                             <div>{chatsRemaining}{chatsRemaining === 1 ? " slot" : " slots"} remaining</div>
 
                             {totalChats >= MAX_CHATS && (
-                            <p className="ai-chat-page__storage-warning">
-                                You've reached your limit of {MAX_CHATS} saved chats.
-                                You can continue existing conversations, but you will need to delete a chat before starting a new one.
-                            </p>
-                        )}
+                                <p className="ai-chat-page__storage-warning">
+                                    You've reached your limit of {MAX_CHATS} saved chats.
+                                    You can continue existing conversations, but you will need to delete a chat before starting a new one.
+                                </p>
+                            )}
                         </div>
 
                         <input
@@ -668,7 +685,7 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
                             {historyLoading ? (
                                 <p>Loading conversations...</p>
                             ) : filteredChats.length === 0 ? (
-                                <p>No previous conversations found.</p>
+                                <p>{previousChats.length === 0 ? "No saved conversations yet." : "No conversations match your search."}</p>
                             ) : (
                                 filteredChats.map((chat) => (
                                     <div
@@ -679,7 +696,7 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
                                             type="button"
                                             className={`ai-chat-page__history-item ${String(sessionId) === String(chat.chat_session_id)
                                                 ? "ai-chat-page__history-item--active" : ""
-                                            }`}//preseves the existing button for opening saved chats
+                                                }`}//preseves the existing button for opening saved chats
                                             onClick={() => openPreviousChat(chat)} //reopen and continue chat
                                             disabled={openingChat || loading || initialisingSession || deletingChat}
                                         >
@@ -852,12 +869,25 @@ function AIChat({ initialDocument, onQuestionSubmitted }) {
                             value={question}
                             onChange={(event) => setQuestion(event.target.value)}
                             placeholder="Ask a question..."
-                            disabled={loading || initialisingSession}
+                            maxLength={MAX_QUESTION_LENGTH}
+                            disabled={loading || initialisingSession || openingChat}
                         />
-                        <button type="submit" disabled={loading || initialisingSession || !question.trim()}>
+                        <button type="submit" disabled={loading || initialisingSession || openingChat || !question.trim()}>
                             {loading ? "Sending..." : "Send"}
                         </button>
                     </form>
+                    <small style={{
+                        display: "block",
+                        textAlign: "right",
+                        marginTop: "6px",
+                        marginRight: "20px",
+                        color: question.length >= MAX_QUESTION_LENGTH ? "#dc2626" : "#64748b"
+                    }}
+                    >
+                        {question.length} / {MAX_QUESTION_LENGTH} characters
+                        {question.length >= MAX_QUESTION_LENGTH && " - Maximum length reached"}
+
+                    </small>
                 </section>
             </div>
         </main>

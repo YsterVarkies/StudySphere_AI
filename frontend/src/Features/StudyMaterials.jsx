@@ -3,17 +3,17 @@ import AIChat from "./AIChat";
 import "./StudyMaterials.css"; // Import the CSS file for styling
 
 /* Global configuration constants  */
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"; // Backend API base URL
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"; // localhost fallback
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB file size limit 
 const MAX_DOCUMENTS = 20; // Max documents per student
 const MAX_DOC_PER_MODULE = 5; // max documents per module
 
 //Allowed types for uploaded study materials
-const ALLOWED_TYPES = [
-    "application/pdf", // .pdf files
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx files
-    "text/plain", // .txt files
-];
+const ALLOWED_TYPES = {
+    pdf: "application/pdf", // .pdf files
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx files
+    txt: "text/plain", // .txt files
+};
 
 /* SESSION HELPERS */
 function getSession() {
@@ -57,6 +57,8 @@ function getToken() {
 function StudyMaterials({ onDocumentUploaded }) {
     // references and state hooks
     const fileInputRef = useRef(null);
+    const uploadingRef = useRef(false);
+    const [dragDoc, setDragDoc] = useState(false);//drag docs to upload area
     const [documents, setDocuments] = useState([]); //list of all loaded docuemnts
     const [modules, setModules] = useState([]); // list of available modules
     const [modulesLoading, setModulesLoading] = useState(false); // loading state for module fetch
@@ -154,42 +156,64 @@ function StudyMaterials({ onDocumentUploaded }) {
         }
     }
 
-    /**
-     * handles file selection validation (type and size checks)
-     */
-    function handleFileChange(event) {
-        const file = event.target.files?.[0];
-        if (!file) return;
+    /* Check File */
+    function checkAndSelectFile(file) {
+        if (!file || uploadingRef.current) {
+            return;
+        }
 
         setError("");
         setMessage("");
 
+        //Check doc storage limit
+        if (documents.length >= MAX_DOCUMENTS) {
+            setError("You have reached the maximum of 20 documents.");
+            return;
+        }
+        //check file extention
         const fileExtension = file.name.split(".").pop()?.toLowerCase();
-        const allowedExtensions = ["pdf", "docx", "txt"];
+        const fileType = ALLOWED_TYPES[fileExtension];
 
-        //validate supported file extensions/types
-        if (!ALLOWED_TYPES.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
-            setError("Invalid file type. Please upload a PDF, DOCX, or TXT file.");
-            event.target.value = "";
+        if (!fileType || (file.type && file.type !== fileType)) {
+            setError("Invalid file type. Please select a PDF, DOCX, or TXT file.");
             return;
         }
 
-        // validate max file size constraints (25MB)
+        // do not accept empty files
+        if (file.size === 0) {
+            setError("The selected file is empty.");
+            return;
+        }
+
+        // do not accept files lareger than 25MB
         if (file.size > MAX_FILE_SIZE) {
             setError("File size exceeds the 25 MB limit.");
-            event.target.value = "";
             return;
         }
 
+        //passed validations
         setSelectedFile(file);
         setTitle(file.name);
+    }
+    /* File Picker */
+    function handleFileChange(event) {
+        const file = event.target.files?.[0];
+
+        checkAndSelectFile(file);
         event.target.value = "";
     }
+
 
     /**
      * uploads the selected file along with metadata and module mapping to the backend.
      */
     async function handleUpload(targetModuleId) {
+
+        //prevent simultaneous uploads
+        if (uploadingRef.current) {
+            return;
+        }
+
         const activeModuleId = targetModuleId || moduleId;
         //prevent uploading when overall doc limit reached
         if (documents.length >= MAX_DOCUMENTS) {
@@ -199,6 +223,12 @@ function StudyMaterials({ onDocumentUploaded }) {
         }
         if (!selectedFile) {
             setError("Please select a file to upload.");
+            return;
+        }
+
+        const noTitle = title.trim();
+        if (!noTitle) {
+            setError("Please enter a document title.");
             return;
         }
 
@@ -226,6 +256,7 @@ function StudyMaterials({ onDocumentUploaded }) {
             return;
         }
 
+        uploadingRef.current = true;
         setUploading(true);
         setError("");
         setMessage("");
@@ -234,7 +265,7 @@ function StudyMaterials({ onDocumentUploaded }) {
 
             const formData = new FormData();
             formData.append("file", selectedFile);
-            formData.append("title", title || selectedFile.name);
+            formData.append("title", noTitle);
             formData.append("moduleId", targetModuleValue); //pass resolved ID/code to backend
 
             const token = getToken();
@@ -266,6 +297,7 @@ function StudyMaterials({ onDocumentUploaded }) {
             console.error("Upload error: ", error);
             setError(error.message || "An error occurred during upload");
         } finally {
+            uploadingRef.current = false;
             setUploading(false);
         }
     }
@@ -361,7 +393,7 @@ function StudyMaterials({ onDocumentUploaded }) {
 
     // helper function to extract document name safely from various schema property names
     function getDocumentName(document) {
-        return (document.name || document.file_name || document.fileName || document.title || document.filename || "Untitled Document");
+        return (document.title || document.name || document.file_name || document.fileName || document.filename || "Untitled Document");
     }
 
     // helper function to extract module name safely from document objects
@@ -469,6 +501,11 @@ function StudyMaterials({ onDocumentUploaded }) {
                 <div className="study-materials-page__modal-backdrop">
                     <div className="study-materials-page__modal">
                         <h2>Upload Document</h2>
+                        {error && (
+                            <p className="study-materials-page__error" role="alert">
+                                {error}
+                            </p>
+                        )}
                         {totalDocs >= MAX_DOCUMENTS && (
                             <p className="study-materials-page__module-limit-warning">
                                 Your document storage is full ({totalDocs} / {MAX_DOCUMENTS}).
@@ -576,6 +613,7 @@ function StudyMaterials({ onDocumentUploaded }) {
                             <button
                                 type="button"
                                 className="study-materials-page__btn-cancel"
+                                disabled={uploading}
                                 onClick={() => {
                                     setSelectedFile(null);
                                     setModuleId("");
@@ -706,6 +744,13 @@ function StudyMaterials({ onDocumentUploaded }) {
                     <p>Loading Documents...</p>
                 ) : (
                     <>
+                    {filteredDocuments.length === 0 && (
+                        <p className="study-materials-page__empty-message">
+                            {documents.length === 0 
+                            ? "No documents uploaded yet. Upload a file to get started."
+                            : "No documents match your search or selected module."}
+                        </p>
+                    )}
                         {filteredDocuments.map((document) => {
                             const docId = document.document_id ?? document.id;
 
@@ -772,12 +817,84 @@ function StudyMaterials({ onDocumentUploaded }) {
                         })}
 
                         {/* Inline Upload DropZone Card */}
-                        <div
-                            className="study-materials-page__dropzone-card"
-                            onClick={() => fileInputRef.current?.click()}
+                        <div className={`study-materials-page__dropzone-card ${dragDoc ? "study-materials-page__dropzone-card--dragging" : ""
+                            }`}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Choose or drop a document to upload"
+                            aria-disabled={uploading}
+
+                            onClick={() => {
+                                if (!uploading) {
+                                    fileInputRef.current?.click();
+                                }
+                            }}
+
+                            onKeyDown={(event) => {
+                                if (!uploading && (event.key === "Enter" || event.key === " ")
+                                ) {
+                                    event.preventDefault();
+                                    fileInputRef.current?.click();
+                                }
+                            }}
+
+                            onDragOver={(event) => {
+                                event.preventDefault();
+
+                                if (!uploading) {
+                                    event.dataTransfer.dropEffect = "copy";
+                                    setDragDoc(true);
+                                }
+                            }}
+                            
+                            onDragLeave={(event) => {
+                                if (!event.currentTarget.contains(event.relatedTarget)) {
+                                    setDragDoc(false);
+                                }
+                            }}
+                            
+                            onDrop={(event) => {
+                                event.preventDefault();
+                                setDragDoc(false);
+
+                                if (uploadingRef.current) return;
+
+                                const files = event.dataTransfer.files;
+
+                                if (files.length === 0) return;
+
+                                if (files.length > 1) {
+                                    setError("Please upload one document at a time.");
+                                    setMessage("");
+                                    return;
+                                }
+                                checkAndSelectFile(files[0]);
+                            }}
                         >
-                            <div className="study-materials-page__dropzone-icon">☁️</div>
-                            <p>Drop a PDF, DOCX or TXT file<br />up to 25MB</p>
+                            <div className="study-materials-page__dropzone-icon"
+                            aria-hidden="true"                           
+                            >
+                                {/* simple upload icon */}
+                                <svg
+                                width="28"
+                                height="28"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                >
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="17 8 12 3 7 8" />
+                                    <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                            </div>
+                            <p>Drag and drop a PDF, DOCX or TXT file here, 
+                                or click to browse.
+                            </p>
+                            <small>Maximum file size: 25 MB</small>
+
                         </div>
                     </>
                 )}
