@@ -1259,7 +1259,10 @@ function App() {
           </section>
           
         ): currentNav === 'study-materials' ? (
-          <StudyMaterials />
+          <StudyMaterials onDocumentUploaded={() => refreshDashboardForUser(user).then((nextDashboardData) => {
+            setDashboardData(nextDashboardData)
+            setDashboardLoadState('ready')
+          }).catch(() => setDashboardLoadState('error'))} />
         ): currentNav === 'ai-chat' ? (
           <AIChat onQuestionSubmitted={() => refreshDashboardForUser(user).then((nextDashboardData) => {
             setDashboardData(nextDashboardData)
