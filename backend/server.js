@@ -30,6 +30,11 @@ async function testDatabaseConnection() {
 const { authenticateToken, requireRole } = require("./middleware/auth.middleware");
 const profileController = require("./controllers/profile.controller");
 
+app.get(
+  '/api/users/profile',
+  authenticateToken,
+  profileController.getMe
+);
 // ROUTES
 
 const authRoutes = require("./routes/auth.routes");
