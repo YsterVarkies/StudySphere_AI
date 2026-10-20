@@ -15,6 +15,49 @@ export default function ProfileSettings({ user, onUpdateUser }) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+ // Fetch user profile and cohorts on load
+  useEffect(() => {
+    async function loadProfileData() {
+      try {
+        const session = JSON.parse(localStorage.getItem('studysphere_session') || '{}');
+        const token = session?.token;
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+        // 1. Fetch public cohorts
+        const cohortRes = await fetch(`${apiUrl}/cohorts/public`);
+        const cohortData = await cohortRes.json();
+        if (cohortRes.ok) {
+          setCohorts(cohortData.cohorts || cohortData);
+        }
+
+        // 2. Fetch fresh user profile containing the student number
+        if (token) {
+          const userRes = await fetch(`${apiUrl}/users/profile`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const userData = await userRes.json();
+          
+          // Unwrap data correctly based on your controller's JSON response format
+          const profile = userData.data || userData.user || userData;
+
+          if (userRes.ok && profile) {
+            setFormData({
+              firstName: profile.firstName || profile.first_name || '',
+              surname: profile.surname || profile.last_name || '',
+              studentNumber: profile.studentNumber || profile.student_number || '',
+              email: profile.email || '',
+              yearOfStudy: profile.year_of_study || profile.yearOfStudy || 3,
+              cohortId: profile.cohort_id || profile.cohortId || '',
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load profile data', err);
+      }
+    }
+    loadProfileData();
+  }, []);
+
   useEffect(() => {
     async function fetchCohorts() {
       try {
