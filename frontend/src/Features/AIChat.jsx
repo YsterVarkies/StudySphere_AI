@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm"; // import the remark-gfm plugin for GitHub F
 import "./AIChat.css"; // import the CSS file for styling the AIChat component
 
 /* GLOBAL CONFIGURATION */
-const API_URL = "http://localhost:5000/api"; // the base URL for the backend API
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"; // the base URL for the backend API
 const MAX_CHATS = 20; //Max saved chats per student
 
 /* SESSION HELPERS */

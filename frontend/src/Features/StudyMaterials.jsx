@@ -3,7 +3,7 @@ import AIChat from "./AIChat";
 import "./StudyMaterials.css"; // Import the CSS file for styling
 
 /* Global configuration constants  */
-const API_URL = "http://localhost:5000/api"; // Backend API base URL
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"; // Backend API base URL
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB file size limit 
 const MAX_DOCUMENTS = 20; // Max documents per student
 const MAX_DOC_PER_MODULE = 5; // max documents per module
