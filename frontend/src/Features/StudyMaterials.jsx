@@ -54,7 +54,7 @@ function getToken() {
 /**
  * Main component for managing and viewing study materials.
  */
-function StudyMaterials() {
+function StudyMaterials({ onDocumentUploaded }) {
     // references and state hooks
     const fileInputRef = useRef(null);
     const [documents, setDocuments] = useState([]); //list of all loaded docuemnts
@@ -261,6 +261,7 @@ function StudyMaterials() {
 
             // refresh document list after successful upload 
             await loadDocuments();
+            onDocumentUploaded?.();
         } catch (error) {
             console.error("Upload error: ", error);
             setError(error.message || "An error occurred during upload");

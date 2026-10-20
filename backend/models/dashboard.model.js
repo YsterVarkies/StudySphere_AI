@@ -36,12 +36,13 @@ async function getDashboardData(user) {
 
   const documentParams = isAdmin ? [] : [userId];
   const [documentRows] = await db.query(
-    `SELECT d.document_id, d.file_name, d.file_size_bytes, d.file_type, d.uploaded_at, d.accessed_at,
+      `SELECT d.document_id, d.title AS file_name, d.file_size AS file_size_bytes,
+        d.file_type, d.uploaded_at, NULL AS accessed_at,
             m.module_name
-     FROM DASHBOARD_DOCUMENT d
+       FROM DOCUMENT d
      LEFT JOIN MODULE m ON m.module_id = d.module_id
      ${isAdmin ? '' : 'WHERE d.user_id = ?'}
-     ORDER BY COALESCE(d.accessed_at, d.uploaded_at) DESC
+       ORDER BY d.uploaded_at DESC
      LIMIT 10`,
     documentParams
   );
