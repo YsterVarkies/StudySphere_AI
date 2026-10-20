@@ -70,6 +70,13 @@ app.use("/api/quizzes", quizRoutes);
 const aiChatRoutes = require("./src/routes/aiChat.routes");
 app.use("/api/chat", aiChatRoutes);
 
+// Get student profile
+app.get(
+    "/api/users/profile",
+    authenticateToken,
+    profileController.getMe
+);
+
 // Student profile update 
 app.put(
     "/api/users/profile",
