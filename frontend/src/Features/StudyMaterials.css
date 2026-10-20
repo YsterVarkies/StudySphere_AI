@@ -707,3 +707,48 @@
     font-weight: 600;
     margin-top: 18px;
 }
+
+.study-materials-page__dropzone-card--dragging {
+  border: 2px dashed #2563eb;
+  background-color: #eff6ff;
+}
+
+.study-materials-page__dropzone-card {
+  cursor: pointer;
+}
+
+.study-materials-page__dropzone-card:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.study-materials-page__dropzone-icon {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: #fff4e8;
+  color: #e07a19;
+}
+
+.study-materials-page__dropzone-card {
+  cursor: pointer;
+  transition: border-color 0.2s ease,
+              background-color 0.2s ease;
+}
+
+.study-materials-page__dropzone-card:hover {
+  border-color: #818cf8;
+  background-color: #f8faff;
+}
+
+.study-materials-page__empty-message {
+  grid-column: 1 / -1;
+  color: #64748b;
+  font-size: 14px;
+  padding: 16px 0;
+}
+
