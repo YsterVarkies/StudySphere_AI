@@ -50,6 +50,13 @@ const register = async (req, res) => {
             });
         }
 
+        if (!/^\d{8}$/.test(normalizedStudentNumber)) {
+            return res.status(400).json({
+                message: "Student number must be exactly 8 digits.",
+                field: "student_number"
+            });
+        }
+
         if (!normalizedRole) {
             return res.status(400).json({
                 message: "Please select a valid role.",

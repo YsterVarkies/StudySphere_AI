@@ -458,6 +458,14 @@ function AnnouncementItem({ announcement, onEdit, onDelete, showActions = false 
   )
 }
 
+function getDashboardFileType(fileType) {
+  const normalizedType = String(fileType || '').toLowerCase()
+  if (normalizedType.includes('pdf')) return 'pdf'
+  if (normalizedType.includes('wordprocessingml') || normalizedType.includes('msword') || normalizedType === 'docx') return 'docx'
+  if (normalizedType.includes('text/plain') || normalizedType === 'txt') return 'txt'
+  return 'file'
+}
+
 function DashboardOverview({
   currentUser,
   sessionDate,
@@ -546,13 +554,20 @@ function DashboardOverview({
 
         <article className="dashboard-list-card panel">
           <div className="dashboard-card-heading"><h2>Recent documents</h2><span>{recentDocuments.length}</span></div>
-          {recentDocuments.length ? recentDocuments.map((document) => (
-            <div className="dashboard-document-row" key={document.id}>
-              <span className={`dashboard-file-icon ${document.fileType.toLowerCase()}`}>{document.fileType.toUpperCase()}</span>
-              <div className="dashboard-list-copy"><strong>{document.fileName}</strong><small>{document.module || 'Unassigned module'} · {formatFileSize(document.fileSizeBytes)}</small></div>
-              <span className="dashboard-comment-icon" aria-hidden="true">▢</span>
-            </div>
-          )) : <p className="dashboard-empty-state">No documents yet.</p>}
+          {recentDocuments.length ? recentDocuments.map((document) => {
+            const fileType = getDashboardFileType(document.fileType)
+            return (
+              <div className="dashboard-document-row" key={document.id}>
+                <span className={`dashboard-file-icon ${fileType}`}>{fileType.toUpperCase()}</span>
+                <div className="dashboard-list-copy dashboard-document-copy">
+                  <strong title={document.fileName}>{document.fileName}</strong>
+                  <small className="dashboard-document-type" title={document.fileType}>{document.fileType}</small>
+                  <small className="dashboard-document-meta">{document.module || 'Unassigned module'} · {formatFileSize(document.fileSizeBytes)}</small>
+                </div>
+                <span className="dashboard-comment-icon" aria-hidden="true">▢</span>
+              </div>
+            )
+          }) : <p className="dashboard-empty-state">No documents yet.</p>}
         </article>
       </section>
 
@@ -791,6 +806,7 @@ export function Registration({ onSignIn }) {
     if (!surname) nextErrors.surname = 'Please enter your last name.'
     else if (surname.length < 2 || !namePattern.test(surname)) nextErrors.surname = 'Enter a valid last name.'
     if (!studentNumber) nextErrors.studentNumber = 'Please enter your student number.'
+    else if (!/^\d{8}$/.test(studentNumber)) nextErrors.studentNumber = 'Student number must be exactly 8 digits.'
     if (!email) nextErrors.email = 'Please enter your email address.'
     else if (!emailPattern.test(email)) nextErrors.email = 'Please enter a valid email address.'
     if (!formData.password) nextErrors.password = 'Please create a password.'
@@ -862,7 +878,7 @@ export function Registration({ onSignIn }) {
     <main className="login-screen">
       <section className="login-brand-panel" aria-label="StudySphere introduction"><div className="login-brand-copy"><div className="login-wordmark"><span className="login-wordmark-mark">S</span><span>StudySphere</span></div><div className="login-brand-text"><p className="login-eyebrow">STUDENT PORTAL</p><h1>Start your next chapter.</h1><p>Create your account and make every study hour count.</p></div></div></section>
       <section className="login-form-panel"><form className="login-card panel registration-card" onSubmit={handleSubmit} noValidate><div className="login-form-heading"><p className="login-form-kicker">CREATE ACCOUNT</p><h1>Register for StudySphere</h1><p className="login-subtitle">Set up your student account to get started.</p></div>
-        <div className="registration-grid">{inputFields.map(([field, label, type, autoComplete]) => <label className="login-field" key={field}>{label}<span className="login-input-wrap"><input type={type} value={formData[field]} onChange={(event) => updateField(field, event.target.value)} autoComplete={autoComplete} /></span>{errors[field] && <span className="login-error" role="alert">{errors[field]}</span>}</label>)}</div>
+        <div className="registration-grid">{inputFields.map(([field, label, type, autoComplete]) => <label className="login-field" key={field}>{label}<span className="login-input-wrap"><input type={type} value={formData[field]} onChange={(event) => updateField(field, event.target.value)} autoComplete={autoComplete} maxLength={field === 'studentNumber' ? 8 : undefined} inputMode={field === 'studentNumber' ? 'numeric' : undefined} /></span>{errors[field] && <span className="login-error" role="alert">{errors[field]}</span>}</label>)}</div>
         <label className="login-field">Password<span className="login-input-wrap"><input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={(event) => updateField('password', event.target.value)} autoComplete="new-password" /><button className="password-toggle" type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label="Toggle password visibility">◉</button></span>{errors.password && <span className="login-error" role="alert">{errors.password}</span>}</label>
         <label className="login-field">Confirm password<span className="login-input-wrap"><input type={showConfirmPassword ? 'text' : 'password'} value={formData.confirmPassword} onChange={(event) => updateField('confirmPassword', event.target.value)} autoComplete="new-password" /><button className="password-toggle" type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label="Toggle confirmation password visibility">◉</button></span>{errors.confirmPassword && <span className="login-error" role="alert">{errors.confirmPassword}</span>}</label>
         <div className="registration-grid optional-fields"><label className="login-field">Role<select required value={formData.role} onChange={(event) => updateField('role', event.target.value)}><option value="">Select role</option><option value="student">Student</option><option value="administrator">Administrator</option></select>{errors.role && <span className="login-error" role="alert">{errors.role}</span>}</label><label className="login-field">Cohort<input type="text" list="registration-cohort-options" value={formData.cohortSearch} onChange={(event) => { const searchValue = event.target.value; const selectedCohort = cohorts.find((cohort) => getCohortLabel(cohort) === searchValue); setFormData((current) => ({ ...current, cohortSearch: searchValue, cohortId: selectedCohort ? String(getCohortId(selectedCohort)) : '' })); }} onFocus={() => { if (formData.cohortId) updateField('cohortSearch', formData.cohortSearch); }} placeholder={isLoadingCohorts ? 'Loading cohorts...' : 'Search and select a cohort'} disabled={isLoadingCohorts || cohorts.length === 0} autoComplete="off" /><datalist id="registration-cohort-options">{filteredCohorts.map((cohort) => <option key={getCohortId(cohort)} value={getCohortLabel(cohort)} />)}</datalist>{errors.cohortId && <span className="login-error" role="alert">{errors.cohortId}</span>}{cohortLoadError && <span className="login-error" role="alert">{cohortLoadError}</span>}{!isLoadingCohorts && !cohortLoadError && cohorts.length === 0 && <span className="login-error" role="alert">No cohorts are currently available.</span>}</label></div>
