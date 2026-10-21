@@ -163,11 +163,11 @@ async function generateContent(prompt, documentContent, options = {}) {
   return completion.choices[0].message.content;
 }
 
-async function chat(question, documentContent = null, fileName = '') {
-  let prompt;
+async function chat(question, documentContent = null, fileName = '', history = []) {
+  let systemPrompt;
 
   if (documentContent) {
-    prompt = `
+    systemPrompt = `
 You are a helpful academic assistant for university students.
 
 The user has selected the document "${fileName || 'study material'}".
@@ -179,19 +179,43 @@ Rules:
 4. You may combine the document and general knowledge when that helps the student.
 5. Do not claim something came from the document unless the document supports it.
 6. Do not invent content as if it were in the document.
-
-Question:
-${question}
-`;
+`.trim();
   } else {
-    prompt = `
+    systemPrompt = `
 You are a helpful academic assistant for university students.
-Answer the following question clearly and helpfully:
-${question}
-`;
+Answer questions clearly and helpfully.
+`.trim();
   }
 
-  return generateContent(prompt, documentContent, { temperature: 0.4 });
+  const messages = [{ role: 'system', content: systemPrompt }];
+
+  if (Array.isArray(history)) {
+    for (const item of history) {
+      if (!item || !item.content) continue;
+      messages.push({
+        role: item.role === 'assistant' ? 'assistant' : 'user',
+        content: String(item.content),
+      });
+    }
+  }
+
+  const studyText = getStudyText(documentContent);
+  let userContent = String(question || '');
+
+  if (studyText.trim()) {
+    userContent =
+      `STUDY MATERIAL:\n${studyText}\n\nQuestion:\n${question}`;
+  }
+
+  messages.push({ role: 'user', content: userContent });
+
+  const completion = await openrouter.chat.completions.create({
+    model: MODEL_NAME,
+    messages,
+    temperature: 0.4,
+  });
+
+  return completion.choices[0].message.content;
 }
 
 async function generateQuiz(
