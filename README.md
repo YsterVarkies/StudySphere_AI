@@ -3,11 +3,11 @@
 
 **Make Every Study Hour Count.**
 
-StudySphere AI is an AI-powered study platform designed to help university students manage their studies, organize learning materials, and prepare for assessments.
+StudySphere AI is an innovative AI study platform meant to support university students in staying on top of their studies, keeping track of all their academic related documents, and preparing for their assessments
 
-The platform combines AI assistance, study planning, revision tools, and academic management in one place.
+The system offers AI assistance, study planning, revision support, and academic management all in one convenient place. 
 
-## 🚀 Features
+## 🚀 Overview
 
 - 🤖 **AI Chat Assistant** – Ask questions and receive AI-powered academic assistance.
 - 📚 **Study Materials** – Upload, organize, and manage PDF, Word, and text documents.
@@ -35,17 +35,17 @@ The platform combines AI assistance, study planning, revision tools, and academi
 
 ## ⚙️ Getting Started
 
-To run StudySphere locally, you need Node.js installed, access to the team's MySQL database, Backblaze B2 storage, and an OpenRouter API key.
+To get started with StudySphere AI you will need to have the following: Node.js installed on your local machine, access to the team's MySQL database, access to the Backblaze B2 service, and an OpenRouter API key. Once you have the requirements you can proceed with cloning the repository and installing the project's dependencies.
 
 ### 1. Clone the Repository
-
+First, you will need to clone the StudySphere_AI repository from GitHub to your local machine.
 ```bash
 git clone https://github.com/YsterVarkies/StudySphere_AI.git
 cd StudySphere_AI
 ```
 
 ### 2. Backend (Terminal 1)
-
+Then, you will need to open a new terminal and enter the following commands:
 ```bash
 cd backend
 npm install
@@ -59,14 +59,14 @@ Alternatively, start the backend using:
 ```bash
 npm start
 ```
-
+You should see the message that the server is running.
 The backend runs locally at:
 
 `http://localhost:5000`
 
 ### 3. Frontend (Terminal 2)
 
-Open a second terminal from the project root.
+Open a second terminal from the project root. Enter the following commands:
 
 ```bash
 cd frontend
@@ -78,7 +78,7 @@ The frontend runs locally at:
 
 `http://localhost:5173`
 
-For additional environment configuration, refer to the Developer Documentation.
+For more information about the setup and environment variables, you can refer to the Developer Documentation.
 
 ## 🌐 Deployment
 
@@ -101,6 +101,7 @@ https://studysphere-ai-s07a.onrender.com/
 The frontend communicates with the backend using the `VITE_API_URL` environment variable.
 
 ### Database and External Services
+The StudySphere AI platform makes use of the following services:
 
 - **Aiven MySQL** – Stores user accounts, study data, and application records.
 - **Backblaze B2** – Stores uploaded study documents.
@@ -108,7 +109,7 @@ The frontend communicates with the backend using the `VITE_API_URL` environment 
 
 ## 👨‍💻 Development
 
-StudySphere AI was developed as a university group project for **CMPG 323**.
+The StudySphere AI project was developed as part of a university group assignment for **CMPG 323**.
 
 ## 📄 License
 
