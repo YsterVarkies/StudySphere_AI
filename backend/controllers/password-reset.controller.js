@@ -2,11 +2,15 @@
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const db = require("../config/db");
-const { sendPasswordResetEmail } = require("../services/email.service");
+const {
+    assertPasswordResetEmailConfigured,
+    sendPasswordResetEmail
+} = require("../services/email.service");
 
 const forgotPassword = async (req, res) => {
     let token;
     let userId;
+    let stage = "configuration";
 
     try {
         const email =
@@ -20,6 +24,29 @@ const forgotPassword = async (req, res) => {
             });
         }
 
+        const frontendUrl = process.env.FRONTEND_URL?.trim();
+        if (!frontendUrl) {
+            const error = new Error("Password reset frontend URL is not configured.");
+            error.code = "RESET_FRONTEND_URL_MISSING";
+            throw error;
+        }
+
+        let parsedFrontendUrl;
+        try {
+            parsedFrontendUrl = new URL(frontendUrl);
+        } catch {
+            const error = new Error("Password reset frontend URL is invalid.");
+            error.code = "RESET_FRONTEND_URL_INVALID";
+            throw error;
+        }
+        if (!["http:", "https:"].includes(parsedFrontendUrl.protocol)) {
+            const error = new Error("Password reset frontend URL is invalid.");
+            error.code = "RESET_FRONTEND_URL_INVALID";
+            throw error;
+        }
+        assertPasswordResetEmailConfigured();
+
+        stage = "account_lookup";
         const [users] = await db.query(
             `SELECT user_id, email
              FROM \`USER\`
@@ -29,6 +56,7 @@ const forgotPassword = async (req, res) => {
 
         // Use the same response whether or not the account exists.
         if (users.length === 0) {
+            console.info("Password reset request completed without sending email: no active account matched.");
             return res.status(200).json({
                 message: "If an account exists for that email, a reset link will be sent."
             });
@@ -36,6 +64,7 @@ const forgotPassword = async (req, res) => {
 
         userId = users[0].user_id;
 
+        stage = "token_storage";
         // Generate a cryptographically secure token.
         token = crypto.randomBytes(32).toString("hex");
 
@@ -59,12 +88,7 @@ const forgotPassword = async (req, res) => {
             [userId, tokenHash]
         );
 
-        const frontendUrl = process.env.FRONTEND_URL;
-
-        if (!frontendUrl) {
-            throw new Error("FRONTEND_URL is not configured.");
-        }
-
+        stage = "email_delivery";
         const resetLink =
             `${frontendUrl.replace(/\/$/, "")}/reset-password?token=${token}`;
 
@@ -74,7 +98,13 @@ const forgotPassword = async (req, res) => {
             message: "If an account exists for that email, a reset link will be sent."
         });
     } catch (error) {
-        console.error("Forgot password error:", error.message);
+        console.error("Forgot password request failed:", {
+            stage,
+            code: error.code || "RESET_REQUEST_FAILED",
+            providerCode: error.providerCode || undefined,
+            responseCode: error.responseCode || undefined,
+            command: error.command || undefined
+        });
 
         // Avoid leaving a usable token behind if email delivery fails.
         if (userId && token) {
@@ -90,21 +120,28 @@ const forgotPassword = async (req, res) => {
                     [userId, tokenHash]
                 );
             } catch (cleanupError) {
-                console.error(
-                    "Reset token cleanup error:",
-                    cleanupError.message
-                );
+                console.error("Reset token cleanup failed:", {
+                    code: cleanupError.code || "RESET_TOKEN_CLEANUP_FAILED"
+                });
             }
         }
 
-        return res.status(500).json({
-            message: "Unable to process the password reset request right now."
+        const unavailable = [
+            "RESET_FRONTEND_URL_MISSING",
+            "RESET_FRONTEND_URL_INVALID",
+            "RESET_EMAIL_CONFIG_MISSING"
+        ].includes(error.code);
+
+        return res.status(unavailable ? 503 : 500).json({
+            message: unavailable
+                ? "Password recovery email is not configured on this server. Please contact the StudySphere administrator."
+                : "Unable to process the password reset request right now."
         });
     }
 };
 
 const resetPassword = async (req, res) => {
-    const { token, password } = req.body;
+    const { token, password, confirmPassword } = req.body;
 
     if (
         typeof token !== "string" ||
@@ -118,6 +155,15 @@ const resetPassword = async (req, res) => {
     if (typeof password !== "string" || password.length < 8) {
         return res.status(400).json({
             message: "Password must be at least 8 characters long."
+        });
+    }
+
+    if (
+        confirmPassword !== undefined &&
+        (typeof confirmPassword !== "string" || password !== confirmPassword)
+    ) {
+        return res.status(400).json({
+            message: "Passwords do not match."
         });
     }
 
@@ -160,12 +206,19 @@ const resetPassword = async (req, res) => {
 
         const reset = tokens[0];
 
-        await connection.query(
+        const [updateResult] = await connection.query(
             `UPDATE \`USER\`
              SET password_hash = ?
              WHERE user_id = ?`,
             [passwordHash, reset.user_id]
         );
+
+        if (updateResult.affectedRows !== 1) {
+            await connection.rollback();
+            return res.status(400).json({
+                message: "The reset link is invalid or has expired."
+            });
+        }
 
         await connection.query(
             `UPDATE PASSWORD_RESET_TOKEN
@@ -188,10 +241,18 @@ const resetPassword = async (req, res) => {
         });
     } catch (error) {
         if (connection) {
-            await connection.rollback();
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                console.error("Password reset rollback failed:", {
+                    code: rollbackError.code || "RESET_ROLLBACK_FAILED"
+                });
+            }
         }
 
-        console.error("Reset password error:", error.message);
+        console.error("Reset password failed:", {
+            code: error.code || "RESET_PASSWORD_FAILED"
+        });
 
         return res.status(500).json({
             message: "Unable to reset the password right now."

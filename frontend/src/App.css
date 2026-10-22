@@ -2403,6 +2403,37 @@ h1 {
   text-decoration: underline;
 }
 
+.forgot-password-link {
+  margin: -4px 0 18px;
+  text-align: right;
+}
+
+.forgot-password-link button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ss-login-accent);
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.forgot-password-link button:hover {
+  color: var(--ss-login-accent-dark);
+  text-decoration: underline;
+}
+
+.auth-success {
+  margin: 4px 0 16px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--ss-login-accent) 20%, transparent);
+  border-radius: var(--ss-radius-control);
+  background: color-mix(in srgb, var(--ss-login-accent) 6%, var(--ss-surface));
+  color: var(--ss-text-primary);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
 .registration-card {
   max-height: calc(100vh - 48px);
   overflow-y: auto;
@@ -2770,4 +2801,3 @@ h1,
   border-color: rgba(27, 120, 208, 0.5);
   box-shadow: 0 0 0 3px rgba(27, 120, 208, 0.1);
 }
-
