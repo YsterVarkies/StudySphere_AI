@@ -1850,6 +1850,46 @@ h1 {
   border-top: 1px solid rgba(52, 75, 92, 0.12);
 }
 
+.dashboard-document-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 20px;
+  align-items: center;
+  min-height: 82px;
+  gap: 12px;
+  padding: 12px 2px;
+}
+
+.dashboard-document-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.dashboard-document-copy strong {
+  width: 100%;
+  line-height: 1.25;
+}
+
+.dashboard-document-type,
+.dashboard-document-meta {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.dashboard-document-type {
+  color: #748493;
+  font-size: 0.72rem;
+}
+
+.dashboard-document-meta {
+  color: #748493;
+  font-size: 0.78rem;
+}
+
 .dashboard-announcement-row:first-of-type {
   margin-top: 10px;
 }
@@ -1990,8 +2030,7 @@ h1 {
   }
 
   .dashboard-announcement-row,
-  .dashboard-deadline-row,
-  .dashboard-document-row {
+  .dashboard-deadline-row {
     align-items: flex-start;
   }
 }

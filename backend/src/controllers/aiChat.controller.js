@@ -178,9 +178,15 @@ exports.sendMessage = async (req, res) => {
       }
     }
 
+    const previousMessages = await AiChat.getMessages(sessionId);
+    const history = previousMessages.slice(-10).map((m) => ({
+      role: m.sender === 'user' ? 'user' : 'assistant',
+      content: m.message_text,
+    }));
+
     let aiReply;
     try {
-      aiReply = await aiService.chat(message, documentContent, fileName);
+      aiReply = await aiService.chat(message, documentContent, fileName, history);
     } catch (aiError) {
       console.error('AI chat failed:', aiError.message);
       return res.status(502).json({

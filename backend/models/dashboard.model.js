@@ -8,7 +8,7 @@ function getUserScope(user) {
 
 async function getDashboardData(user) {
   const { isAdmin, userId } = getUserScope(user);
-  const moduleWhere = isAdmin ? '' : 'WHERE um.user_id = ?';
+  const moduleWhere = isAdmin ? '' : 'WHERE u.user_id = ?';
   const moduleParams = isAdmin ? [] : [userId];
 
   const [moduleRows] = await db.query(
@@ -16,7 +16,7 @@ async function getDashboardData(user) {
      FROM \`MODULE\` m
      ${isAdmin
        ? 'LEFT JOIN USER_MODULE um ON um.module_id = m.module_id LEFT JOIN COHORT c ON c.cohort_id = um.cohort_id'
-       : 'INNER JOIN USER_MODULE um ON um.module_id = m.module_id LEFT JOIN COHORT c ON c.cohort_id = um.cohort_id'}
+      : 'INNER JOIN COHORT_MODULE cm ON cm.module_id = m.module_id INNER JOIN `USER` u ON u.cohort_id = cm.cohort_id LEFT JOIN COHORT c ON c.cohort_id = u.cohort_id'}
      ${moduleWhere}
     GROUP BY m.module_id, m.module_code, m.module_name
      ORDER BY m.module_code`,
