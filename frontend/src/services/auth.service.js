@@ -35,3 +35,11 @@ export function registerUser(data) {
 export function loginUser(data) {
   return postAuth('/auth/login', data)
 }
+
+export function requestPasswordReset(data) {
+  return postAuth('/auth/forgot-password', data)
+}
+
+export function resetPassword(data) {
+  return postAuth('/auth/reset-password', data)
+}

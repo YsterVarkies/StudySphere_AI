@@ -1,7 +1,7 @@
 import UserManagement from './components/UserManagement'
 import AnalyticsDashboard from './components/AnalyticsDashboard'
 import ModulesAndCohorts from './components/ModulesAndCohorts'
-import { loginUser, registerUser } from './services/auth.service'
+import { loginUser, registerUser, requestPasswordReset, resetPassword } from './services/auth.service'
 import StudyMaterials from './Features/StudyMaterials'
 import AIChat from './Features/AIChat'
 import RevisionHub from './Features/RevisionHub'
@@ -592,7 +592,7 @@ function SuccessNotice({ message }) {
   return <div className="success-notice" role="status">{message}</div>
 }
 
-export function Login({ onLogin, onRegister, successMessage }) {
+export function Login({ onLogin, onRegister, onForgotPassword, successMessage }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState({})
@@ -714,9 +714,193 @@ export function Login({ onLogin, onRegister, successMessage }) {
             {errors.password && <span className="login-error" role="alert">{errors.password}</span>}
           </label>
 
+          <p className="forgot-password-link"><button type="button" onClick={onForgotPassword}>Forgot Password?</button></p>
           {errors.form && <p className="login-error" role="alert">{errors.form}</p>}
           <button className="planner-button login-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Logging in...' : 'Log in'}</button>
           <p className="auth-switch">Don&apos;t have an account? <button type="button" onClick={onRegister}>Register</button></p>
+          <p className="login-footer">StudySphere · Student Portal</p>
+        </form>
+      </section>
+    </main>
+  )
+}
+
+function PasswordRecovery({ mode, token, onBackToLogin, onResetSuccess }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isComplete, setIsComplete] = useState(false)
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    if (isSubmitting) return
+
+    setError('')
+    setMessage('')
+
+    if (mode === 'forgot') {
+      const normalizedEmail = email.trim().toLowerCase()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        setError('Please enter a valid email address.')
+        return
+      }
+
+      setIsSubmitting(true)
+      try {
+        const response = await requestPasswordReset({ email: normalizedEmail })
+        setMessage(response.message)
+      } catch (requestError) {
+        setError(requestError.message || 'Unable to process the password reset request right now.')
+      } finally {
+        setIsSubmitting(false)
+      }
+      return
+    }
+
+    if (!token || !/^[a-f0-9]{64}$/i.test(token)) {
+      setError('This reset link is invalid or has expired.')
+      return
+    }
+    if (!password) {
+      setError('Please enter a new password.')
+      return
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      setError('Password must contain at least one letter and one number.')
+      return
+    }
+    if (!confirmPassword) {
+      setError('Please confirm your new password.')
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const response = await resetPassword({ token, password })
+      setMessage(response.message)
+      setIsComplete(true)
+      onResetSuccess()
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to reset the password right now.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const isForgot = mode === 'forgot'
+
+  return (
+    <main className="login-screen">
+      <section className="login-brand-panel" aria-label="StudySphere introduction">
+        <div className="login-brand-copy">
+          <div className="login-wordmark">
+            <span className="login-wordmark-mark">S</span>
+            <span>StudySphere</span>
+          </div>
+          <div className="login-brand-text">
+            <p className="login-eyebrow">STUDENT PORTAL</p>
+            <h1>Make every study hour count.</h1>
+            <p>Organise your learning, stay on top of deadlines, and move forward with confidence.</p>
+          </div>
+        </div>
+        <div className="login-decoration" aria-hidden="true">
+          <span className="login-orbit login-orbit-one"></span>
+          <span className="login-orbit login-orbit-two"></span>
+          <span className="login-decoration-card login-decoration-card-one">03</span>
+          <span className="login-decoration-card login-decoration-card-two">Focus</span>
+        </div>
+      </section>
+
+      <section className="login-form-panel">
+        <form className="login-card panel" onSubmit={handleSubmit} noValidate>
+          <div className="login-form-heading">
+            <p className="login-form-kicker">{isForgot ? 'ACCOUNT RECOVERY' : 'SECURE YOUR ACCOUNT'}</p>
+            <h1>{isForgot ? 'Forgot your password?' : 'Reset your password'}</h1>
+            <p className="login-subtitle">
+              {isForgot
+                ? 'Enter your registered email and we’ll send a reset link if an account matches.'
+                : 'Choose a new password for your StudySphere account.'}
+            </p>
+          </div>
+
+          {isComplete ? (
+            <>
+              <p className="auth-success" role="status">{message}</p>
+              <button className="planner-button login-submit" type="button" onClick={onBackToLogin}>Return to log in</button>
+            </>
+          ) : (
+            <>
+              {isForgot ? (
+                <label className="login-field">
+                  Email address
+                  <span className="login-input-wrap">
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      autoComplete="email"
+                      required
+                    />
+                  </span>
+                </label>
+              ) : (
+                <>
+                  {(!token || !/^[a-f0-9]{64}$/i.test(token)) && <p className="login-error" role="alert">This reset link is invalid or has expired.</p>}
+                  <label className="login-field">
+                    New password
+                    <span className="login-input-wrap">
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        autoComplete="new-password"
+                        required
+                      />
+                    </span>
+                  </label>
+                  <label className="login-field">
+                    Confirm new password
+                    <span className="login-input-wrap">
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(event) => setConfirmPassword(event.target.value)}
+                        autoComplete="new-password"
+                        required
+                      />
+                    </span>
+                  </label>
+                </>
+              )}
+
+              {error && <p className="login-error" role="alert">{error}</p>}
+              {message && <p className="auth-success" role="status">{message}</p>}
+              {(!isForgot || !message) && (
+                <button className="planner-button login-submit" type="submit" disabled={isSubmitting || (!isForgot && (!token || !/^[a-f0-9]{64}$/i.test(token)))}>
+                  {isSubmitting
+                    ? (isForgot ? 'Sending reset link...' : 'Updating password...')
+                    : (isForgot ? 'Send reset link' : 'Reset password')}
+                </button>
+              )}
+            </>
+          )}
+          {!isComplete && (
+            <p className="auth-switch">
+              {isForgot ? 'Remembered your password?' : 'Already reset your password?'}{' '}
+              <button type="button" onClick={onBackToLogin}>Return to log in</button>
+            </p>
+          )}
           <p className="login-footer">StudySphere · Student Portal</p>
         </form>
       </section>
@@ -892,6 +1076,7 @@ function App() {
   const [activeNav, setActiveNav] = useState(() => loadSession()?.user?.role === 'admin' ? 'analytics' : 'dashboard')
   const [openMenu, setOpenMenu] = useState(false) // check if mobile sidebar is open 
   const [authView, setAuthView] = useState('login')
+  const [authView, setAuthView] = useState(() => window.location.pathname.endsWith('/reset-password') ? 'reset' : 'login')
   const [user, setUser] = useState(() => loadSession()?.user || null)
   const [announcements, setAnnouncements] = useState([])
   const [announcementError, setAnnouncementError] = useState('')
@@ -1078,10 +1263,37 @@ function App() {
     }
   }
 
-  if (!user) {
+  const returnToLogin = () => {
+    if (window.location.pathname.endsWith('/reset-password')) {
+      const applicationRoot = new URL(import.meta.env.BASE_URL, window.location.origin).pathname
+      window.history.replaceState(null, '', applicationRoot)
+    }
+    setAuthView('login')
+  }
+
+  if (!user || authView === 'reset') {
+    if (authView === 'reset') {
+      return <PasswordRecovery
+        mode="reset"
+        token={new URLSearchParams(window.location.search).get('token')}
+        onBackToLogin={returnToLogin}
+        onResetSuccess={() => {
+          clearSession()
+          setUser(null)
+        }}
+      />
+    }
+
     return authView === 'register'
       ? <Registration onSignIn={() => setAuthView('login')} />
-      : <Login onLogin={handleLogin} onRegister={() => setAuthView('register')} successMessage={successMessage} />
+      : authView === 'forgot'
+        ? <PasswordRecovery mode="forgot" onBackToLogin={returnToLogin} />
+        : <Login
+            onLogin={handleLogin}
+            onRegister={() => setAuthView('register')}
+            onForgotPassword={() => setAuthView('forgot')}
+            successMessage={successMessage}
+          />
   }
 
   const currentUser = user
