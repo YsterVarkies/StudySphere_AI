@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 async function postAuth(path, data) {
   let response
@@ -34,4 +34,12 @@ export function registerUser(data) {
 
 export function loginUser(data) {
   return postAuth('/auth/login', data)
+}
+
+export function requestPasswordReset(data) {
+  return postAuth('/auth/forgot-password', data)
+}
+
+export function resetPassword(data) {
+  return postAuth('/auth/reset-password', data)
 }
