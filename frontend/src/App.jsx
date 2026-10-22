@@ -1074,6 +1074,7 @@ export function Registration({ onSignIn }) {
 
 function App() {
   const [activeNav, setActiveNav] = useState(() => loadSession()?.user?.role === 'admin' ? 'analytics' : 'dashboard')
+  const [openMenu, setOpenMenu] = useState(false) // check if mobile sidebar is open 
   const [authView, setAuthView] = useState(() => window.location.pathname.endsWith('/reset-password') ? 'reset' : 'login')
   const [user, setUser] = useState(() => loadSession()?.user || null)
   const [announcements, setAnnouncements] = useState([])
@@ -1313,13 +1314,57 @@ function App() {
   return (
     <div className="app-shell">
       <SuccessNotice message={successMessage} />
-      <aside className="sidebar">
+      {/* Hamburger menu for mobile */}
+      <header className="menu-bar-mobile">
+        <button 
+        type="button"
+        className="menu-button-mobile"
+        aria-label="Open navigation menu"
+        aria-controls="main-sidebar"
+        aria-expanded={openMenu}
+        onClick={() => setOpenMenu(true)}
+        >
+          ☰
+        </button>
+        <strong>StudySphere</strong>
+         </header>
+        {/* background overlay */}
+        {openMenu && (
+          <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Close navigation menu"
+          onClick={() => setOpenMenu(false)}
+          />
+        )}
+     
+      <aside
+        id="main-sidebar"
+        className={`sidebar ${openMenu ? 'mobile-open' : ''}`}
+      >
         <div className="brand">
           <div className="brand-mark">S</div>
           <span>StudySphere</span>
+
+          <button
+          type="button"
+          className="sidebar-close"
+          aria-label="Close navigation menu"
+          onClick={() => setOpenMenu(false)}
+          >
+            x
+          </button>
         </div>
 
-        <nav className="sidebar-nav" aria-label="Main navigation">
+        <nav 
+        className="sidebar-nav" 
+        aria-label="Main navigation"
+        onClick={(event) => {
+          if (event.target.closest('.nav-item')) { //close the mobile sidebar, when a navigation item is clicked
+            setOpenMenu(false)
+          }
+        }}
+        >
           {!isAdministrator && <div className="nav-group">
             <p className="nav-label">Student</p>
             <button
