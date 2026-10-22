@@ -1075,7 +1075,6 @@ export function Registration({ onSignIn }) {
 function App() {
   const [activeNav, setActiveNav] = useState(() => loadSession()?.user?.role === 'admin' ? 'analytics' : 'dashboard')
   const [openMenu, setOpenMenu] = useState(false) // check if mobile sidebar is open 
-  const [authView, setAuthView] = useState('login')
   const [authView, setAuthView] = useState(() => window.location.pathname.endsWith('/reset-password') ? 'reset' : 'login')
   const [user, setUser] = useState(() => loadSession()?.user || null)
   const [announcements, setAnnouncements] = useState([])
