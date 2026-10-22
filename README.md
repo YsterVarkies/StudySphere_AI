@@ -25,12 +25,13 @@ The platform combines AI assistance, study planning, revision tools, and academi
 | Vite | Express.js | OpenRouter AI |
 | JavaScript | JWT | Backblaze B2 |
 | CSS | bcrypt | GitHub Pages |
+| | | Render |
 
 ## 📁 Project Structure
 
 - `frontend/` – React user interface
 - `backend/` – API, database, and server logic
-- `.github/workflows/` – Deployment automation
+- `.github/workflows/` – Automated frontend deployment
 
 ## ⚙️ Getting Started
 
@@ -48,8 +49,8 @@ cd StudySphere_AI
 ```bash
 cd backend
 npm install
-# create backend/.env (see developer documentation section 3.2)
-# make sure the CA certificate path exists
+# Create backend/.env (see Developer Documentation section 3.2)
+# Make sure the CA certificate path exists
 node server.js
 ```
 
@@ -59,7 +60,7 @@ Alternatively, start the backend using:
 npm start
 ```
 
-The backend runs at:
+The backend runs locally at:
 
 `http://localhost:5000`
 
@@ -73,7 +74,7 @@ npm install
 npm run dev
 ```
 
-The frontend runs at:
+The frontend runs locally at:
 
 `http://localhost:5173`
 
@@ -81,11 +82,29 @@ For additional environment configuration, refer to the Developer Documentation.
 
 ## 🌐 Deployment
 
-The frontend uses GitHub Actions and GitHub Pages for deployment.
+StudySphere AI uses GitHub Pages and Render to host its frontend and backend.
 
-**Website:** https://ystervarkies.github.io/StudySphere_AI/
+### Frontend – GitHub Pages
 
-The backend requires separate hosting for database-connected and AI-powered features to work online.
+The React frontend is deployed through GitHub Pages using GitHub Actions for automated builds and deployment.
+
+**Website:**
+https://ystervarkies.github.io/StudySphere_AI/
+
+### Backend – Render
+
+The Node.js and Express backend is hosted on Render, providing the API services required by the application.
+
+**Backend API:**
+https://studysphere-ai-s07a.onrender.com/
+
+The frontend communicates with the backend using the `VITE_API_URL` environment variable.
+
+### Database and External Services
+
+- **Aiven MySQL** – Stores user accounts, study data, and application records.
+- **Backblaze B2** – Stores uploaded study documents.
+- **OpenRouter AI** – Powers AI chat, quizzes, and flashcard generation.
 
 ## 👨‍💻 Development
 
@@ -98,5 +117,3 @@ This project is licensed under the MIT License.
 ---
 
 **StudySphere AI – Learn Smarter. Stay Organized. Revise with Confidence.**
-
-
